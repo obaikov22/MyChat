@@ -772,6 +772,10 @@
         }
 
         function muteUser(targetUsername) {
+            if (msgUsername === targetUsername) {
+                return;
+            }
+
             const duration = prompt(`На сколько секунд замутить ${targetUsername}? (например, 60)`);
             if (duration && !isNaN(duration)) {
                 socket.emit("mute user", { room: currentRoom, targetUsername, duration: parseInt(duration) });
@@ -779,6 +783,10 @@
         }
 
         function banUser(targetUsername) {
+            if (msgUsername === targetUsername) {
+                return;
+            }
+            
             if (confirm(`Забанить ${targetUsername}?`)) {
                 socket.emit("ban user", { room: currentRoom, targetUsername });
             }
