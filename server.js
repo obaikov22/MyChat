@@ -253,8 +253,8 @@ io.on("connection", (socket) => {
         const trimmedPassword = password.trim();
 
         try {
-            const users = (await pool.query(`SELECT * FROM users WHERE nickname = $1`, [trimmedNickname])).rows;
-            const isUserFound = users.length > 0;
+            const databaseUsers = (await pool.query(`SELECT * FROM users WHERE nickname = $1`, [trimmedNickname])).rows;
+            const isUserFound = databaseUsers.length > 0;
 
             if (!isUserFound) {
                 if (blacklistedNicknames.includes(lowerNickname)) {
@@ -275,9 +275,9 @@ io.on("connection", (socket) => {
                 console.log(`Пользователь ${trimmedNickname} успешно зарегистрирован`);
                 updateUserList();
             } else {
-                const [user] = users;
+                const [databaseUser] = databaseUsers;
 
-                const userMatch = await bcrypt.compare(trimmedPassword, user.password);
+                const userMatch = await bcrypt.compare(trimmedPassword, databaseUser.password);
                 if (userMatch) {
                     if (Array.from(users.values()).includes(trimmedNickname)) {
                         socket.emit("auth error", "Пользователь уже в сети");
