@@ -794,6 +794,7 @@
 
         function getUserRoleIcon(username) {
             const groups = userGroups.get(username.toLowerCase()) || [];
+            console.log(`"${username}"`, groups)
             if (groups.includes("Администратор")) return "👑";
             if (groups.includes("Модератор")) return "🛡️";
             return "";
