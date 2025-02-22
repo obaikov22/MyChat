@@ -72,16 +72,19 @@ async function updateUserList() {
         // Получаем всех зарегистрированных пользователей из базы
         const allUsersRes = await pool.query(`SELECT nickname FROM users`);
         const allUsers = allUsersRes.rows.map(row => row.nickname);
-        
+        console.log("Все пользователи из базы:", allUsers);
+
         // Получаем активных пользователей
         const onlineUsers = Array.from(users.values());
-        
+        console.log("Онлайн пользователи:", onlineUsers);
+
         // Формируем список с сортировкой (онлайн сверху)
         const userList = allUsers.sort((a, b) => {
             const aOnline = onlineUsers.includes(a);
             const bOnline = onlineUsers.includes(b);
-            return (bOnline - aOnline); // Онлайн (1) выше оффлайн (0)
+            return bOnline - aOnline; // Онлайн (1) выше оффлайн (0)
         });
+        console.log("Отсортированный список:", userList);
 
         // Отправляем список и статистику всем клиентам
         io.emit("update users", {
@@ -89,7 +92,7 @@ async function updateUserList() {
             onlineCount: onlineUsers.length,
             totalCount: allUsers.length
         });
-        console.log(`Обновлён список пользователей: онлайн ${onlineUsers.length}/${allUsers.length}`);
+        console.log(`Отправлено: онлайн ${onlineUsers.length}/${allUsers.length}`);
     } catch (err) {
         console.error("Ошибка обновления списка пользователей:", err.message);
     }

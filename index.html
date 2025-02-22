@@ -638,17 +638,18 @@
         });
 
         socket.on("update users", ({ users, onlineCount, totalCount }) => {
+            console.log("Получены пользователи:", users, "Онлайн:", onlineCount, "Всего:", totalCount);
             usersList.innerHTML = "";
-            const onlineUsers = Array.from(socket.io.engine.clients.keys()).map(id => users.get(id)).filter(Boolean);
+            const onlineUsers = Array.from(users).filter(user => socket.io.engine.clientsCount > 0 && Array.from(users.values()).includes(user));
             users.forEach(user => {
                 const li = document.createElement("li");
                 li.textContent = user;
                 const isOnline = onlineUsers.includes(user);
                 if (!isOnline) {
-                    li.classList.add("offline"); // Добавляем класс для оффлайн пользователей
+                    li.classList.add("offline");
                 }
                 if (user.toLowerCase() === "admin") {
-                    li.style.color = isOnline ? "#D32F2F" : "#999"; // Красный для админа онлайн, серый для оффлайн
+                    li.style.color = isOnline ? "#D32F2F" : "#999";
                 } else if (username.toLowerCase() === "admin" && isOnline) {
                     const muteIcon = document.createElement("button");
                     muteIcon.innerHTML = "🔇";
