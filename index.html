@@ -658,6 +658,7 @@
         let currentRoom = "room1";
         let username = "";
         let replyingTo = null;
+        let userPermissions = {};
 
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
@@ -704,12 +705,16 @@
             }
         }
 
-        socket.on("auth success", ({ nickname, token }) => {
+        socket.on("auth success", ({ nickname, token, permissions }) => {
             console.log("Успешная авторизация:", nickname);
             username = nickname;
+            userPermissions = permissions;
             localStorage.setItem("chatToken", token);
             authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
+            if (userPermissions.clearChat) {
+                adminControls.classList.remove("hidden");
+            }
             joinRoom();
         });
 
@@ -869,19 +874,24 @@
                 }
                 if (user.toLowerCase() === "admin") {
                     li.style.color = isOnline ? "#D32F2F" : "#999";
-                } else if (username.toLowerCase() === "admin" && isOnline) {
-                    const muteIcon = document.createElement("button");
-                    muteIcon.innerHTML = "🔇";
-                    muteIcon.className = "admin-icon";
-                    muteIcon.title = "Мут";
-                    muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user); };
-                    const banIcon = document.createElement("button");
-                    banIcon.innerHTML = "🚫";
-                    banIcon.className = "admin-icon";
-                    banIcon.title = "Бан";
-                    banIcon.onclick = (e) => { e.stopPropagation(); banUser(user); };
-                    li.appendChild(muteIcon);
-                    li.appendChild(banIcon);
+                }
+                if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
+                    if (userPermissions.muteUsers) {
+                        const muteIcon = document.createElement("button");
+                        muteIcon.innerHTML = "🔇";
+                        muteIcon.className = "admin-icon";
+                        muteIcon.title = "Мут";
+                        muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user); };
+                        li.appendChild(muteIcon);
+                    }
+                    if (userPermissions.banUsers) {
+                        const banIcon = document.createElement("button");
+                        banIcon.innerHTML = "🚫";
+                        banIcon.className = "admin-icon";
+                        banIcon.title = "Бан";
+                        banIcon.onclick = (e) => { e.stopPropagation(); banUser(user); };
+                        li.appendChild(banIcon);
+                    }
                 }
                 usersList.appendChild(li);
             });

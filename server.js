@@ -202,7 +202,7 @@ async function getChatHistory(room, socketId) {
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
-            canDelete: userPermissions.deleteMessages // Добавляем право удаления
+            canDelete: userPermissions.deleteMessages
         }));
     } catch (err) {
         console.error("Ошибка загрузки истории:", err.message);
@@ -270,7 +270,8 @@ io.on("connection", (socket) => {
                 );
                 users.set(socket.id, trimmedNickname);
                 const token = generateToken(trimmedNickname);
-                socket.emit("auth success", { nickname: trimmedNickname, token });
+                const permissions = await getUserPermissions(trimmedNickname);
+                socket.emit("auth success", { nickname: trimmedNickname, token, permissions });
                 console.log(`Пользователь ${trimmedNickname} успешно зарегистрирован`);
                 updateUserList();
             }
@@ -300,7 +301,8 @@ io.on("connection", (socket) => {
                         users.set(socket.id, trimmedNickname);
                         await pool.query(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE nickname = $1`, [trimmedNickname]);
                         const token = generateToken(trimmedNickname);
-                        socket.emit("auth success", { nickname: trimmedNickname, token });
+                        const permissions = await getUserPermissions(trimmedNickname);
+                        socket.emit("auth success", { nickname: trimmedNickname, token, permissions });
                         console.log(`${trimmedNickname} вошёл`);
                         updateUserList();
                     }
@@ -322,7 +324,8 @@ io.on("connection", (socket) => {
             } else {
                 users.set(socket.id, nickname);
                 await pool.query(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE nickname = $1`, [nickname]);
-                socket.emit("auth success", { nickname, token });
+                const permissions = await getUserPermissions(nickname);
+                socket.emit("auth success", { nickname, token, permissions });
                 console.log(`${nickname} вошёл автоматически`);
                 updateUserList();
             }
@@ -366,7 +369,7 @@ io.on("connection", (socket) => {
             messageId, 
             replyTo, 
             type: "message",
-            canDelete: permissions.deleteMessages // Добавляем право удаления
+            canDelete: permissions.deleteMessages
         };
         if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
