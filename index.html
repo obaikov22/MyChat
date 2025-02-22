@@ -23,7 +23,7 @@
             border-radius: 15px;
             box-shadow: 0 8px 25px rgba(155, 89, 182, 0.2);
             display: flex;
-            flex-direction: row;
+            flex-direction: column; /* Исправлено для корректной компоновки */
             transition: all 0.3s ease;
         }
         .chat-container {
@@ -80,6 +80,7 @@
             border-radius: 25px;
             cursor: pointer;
             transition: background 0.3s ease, transform 0.2s ease;
+            margin: 5px 0;
         }
         button:hover {
             background: #7E57C2;
@@ -199,12 +200,7 @@
             color: #EF5350;
             font-size: 0.9em;
             margin-top: 5px;
-        }
-        .auth-toggle {
-            color: #9B59B6;
-            cursor: pointer;
-            margin-top: 10px;
-            text-decoration: underline;
+            text-align: center;
         }
         .users-panel {
             width: 250px;
@@ -294,7 +290,6 @@
                 padding: 10px;
             }
             .chat-room, .auth-container {
-                flex-direction: column;
                 width: 100%;
                 padding: 15px;
                 box-shadow: none;
@@ -427,6 +422,7 @@
         function register() {
             const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
+            console.log("Регистрация:", nickname, password); // Отладка
             if (nickname && password) {
                 socket.emit("register", { nickname, password });
             } else {
@@ -437,6 +433,7 @@
         function login() {
             const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
+            console.log("Вход:", nickname, password); // Отладка
             if (nickname && password) {
                 socket.emit("login", { nickname, password });
             } else {
@@ -445,6 +442,7 @@
         }
 
         socket.on("auth success", (setUsername) => {
+            console.log("Успешная авторизация:", setUsername); // Отладка
             username = setUsername;
             authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
@@ -455,6 +453,7 @@
         });
 
         socket.on("auth error", (message) => {
+            console.log("Ошибка авторизации:", message); // Отладка
             authError.innerText = message;
         });
 
@@ -464,6 +463,7 @@
 
         function joinRoom() {
             currentRoom = document.getElementById("room-select").value;
+            console.log("Присоединяюсь к комнате:", currentRoom); // Отладка
             socket.emit("join room", currentRoom);
             document.getElementById("messages").innerHTML = "";
         }

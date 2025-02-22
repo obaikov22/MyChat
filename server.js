@@ -3,12 +3,12 @@ const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
+const bcrypt = require("bcrypt");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Подключаем базу данных SQLite
 const db = new sqlite3.Database("./chat.db", (err) => {
     if (err) {
         console.error("Ошибка подключения к базе данных:", err.message);
@@ -17,19 +17,27 @@ const db = new sqlite3.Database("./chat.db", (err) => {
     }
 });
 
-// Создаём таблицу сообщений, если её нет
-db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        room TEXT NOT NULL,
-        username TEXT NOT NULL,
-        msg TEXT NOT NULL,
-        timestamp TEXT NOT NULL,
-        messageId TEXT NOT NULL,
-        replyTo TEXT,
-        type TEXT NOT NULL
-    )
-`);
+db.serialize(() => {
+    db.run(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nickname TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    `);
+    db.run(`
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room TEXT NOT NULL,
+            username TEXT NOT NULL,
+            msg TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            messageId TEXT NOT NULL,
+            replyTo TEXT,
+            type TEXT NOT NULL
+        )
+    `);
+});
 
 app.get("/", (req, res) => {
     res.sendFile(__dirname + "/index.html");
@@ -44,14 +52,15 @@ const blacklistedNicknames = [
     "administrator", "админ", "moderator", "модератор", "root", "superuser"
 ].map(name => name.toLowerCase());
 
-const adminPassword = "MySecretPassword123"; // Замени на свой пароль
-const MAX_MESSAGES = 100; // Ограничение на 100 сообщений
+const adminPassword = "MySecretPassword123";
+const MAX_MESSAGES = 100;
 
 function updateRoomUsers(room) {
-    const roomUsers = Array.from(io.sockets.sockets.values())
-        .filter(s => s.rooms.has(room))
-        .map(s => users.get(s.id));
+    const roomUsers = Array.from(io.sockets.adapter.rooms.get(room) || [])
+        .map(socketId => users.get(socketId))
+        .filter(username => username);
     io.to(room).emit("update users", roomUsers);
+    console.log(`Обновлён список пользователей в ${room}: ${roomUsers}`);
 }
 
 function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }, callback) {
@@ -63,7 +72,6 @@ function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type 
                 console.error("Ошибка сохранения сообщения:", err.message);
                 callback(err);
             } else {
-                // Удаляем старые сообщения, если их больше 100
                 db.run(`
                     DELETE FROM messages 
                     WHERE room = ? AND id NOT IN (
@@ -109,44 +117,110 @@ function getChatHistory(room, callback) {
 }
 
 io.on("connection", (socket) => {
-    console.log("Пользователь подключился");
+    console.log("Пользователь подключился:", socket.id);
 
-    socket.on("set username", ({ username, password }) => {
-        const trimmedUsername = username.trim();
-        const lowerUsername = trimmedUsername.toLowerCase();
+    socket.on("register", ({ nickname, password }) => {
+        console.log(`Регистрация: ${nickname}`);
+        const trimmedNickname = nickname.trim();
+        const lowerNickname = trimmedNickname.toLowerCase();
 
-        if (!trimmedUsername) {
-            socket.emit("username error", "Никнейм не может быть пустым");
+        if (!trimmedNickname || !password) {
+            socket.emit("auth error", "Ник и пароль обязательны");
             return;
         }
 
-        if (lowerUsername === "admin") {
-            if (!password || password !== adminPassword) {
-                socket.emit("admin password required");
+        if (blacklistedNicknames.includes(lowerNickname) && lowerNickname !== "admin") {
+            socket.emit("auth error", "Этот никнейм запрещён");
+            return;
+        }
+
+        db.get(`SELECT * FROM users WHERE nickname = ?`, [trimmedNickname], (err, row) => {
+            if (err) {
+                console.error("Ошибка проверки ника:", err.message);
+                socket.emit("auth error", "Ошибка сервера");
                 return;
             }
-        } else if (blacklistedNicknames.includes(lowerUsername)) {
-            socket.emit("username error", "Этот никнейм запрещён");
+
+            if (row) {
+                socket.emit("auth error", "Этот никнейм уже зарегистрирован, используйте вход");
+            } else {
+                bcrypt.hash(password, 10, (err, hashedPassword) => {
+                    if (err) {
+                        console.error("Ошибка хеширования пароля:", err.message);
+                        socket.emit("auth error", "Ошибка сервера");
+                        return;
+                    }
+
+                    db.run(
+                        `INSERT INTO users (nickname, password) VALUES (?, ?)`,
+                        [trimmedNickname, hashedPassword],
+                        (err) => {
+                            if (err) {
+                                console.error("Ошибка регистрации:", err.message);
+                                socket.emit("auth error", "Ошибка сервера");
+                            } else {
+                                users.set(socket.id, trimmedNickname);
+                                socket.emit("auth success", trimmedNickname);
+                                console.log(`Зарегистрирован ${trimmedNickname}`);
+                            }
+                        }
+                    );
+                });
+            }
+        });
+    });
+
+    socket.on("login", ({ nickname, password }) => {
+        console.log(`Вход: ${nickname}`);
+        const trimmedNickname = nickname.trim();
+        const lowerNickname = trimmedNickname.toLowerCase();
+
+        if (!trimmedNickname || !password) {
+            socket.emit("auth error", "Ник и пароль обязательны");
             return;
         }
 
-        if (Array.from(users.values()).some(u => u.toLowerCase() === lowerUsername)) {
-            socket.emit("username error", "Этот никнейм уже занят");
-            return;
-        }
+        db.get(`SELECT * FROM users WHERE nickname = ?`, [trimmedNickname], (err, row) => {
+            if (err) {
+                console.error("Ошибка проверки ника:", err.message);
+                socket.emit("auth error", "Ошибка сервера");
+                return;
+            }
 
-        users.set(socket.id, trimmedUsername);
-        socket.emit("username set", trimmedUsername);
-        console.log(`Ник ${trimmedUsername} установлен для ${socket.id}`);
+            if (!row) {
+                socket.emit("auth error", "Этот никнейм не зарегистрирован");
+            } else {
+                bcrypt.compare(password, row.password, (err, match) => {
+                    if (err) {
+                        console.error("Ошибка проверки пароля:", err.message);
+                        socket.emit("auth error", "Ошибка сервера");
+                        return;
+                    }
+
+                    if (match) {
+                        if (Array.from(users.values()).includes(trimmedNickname)) {
+                            socket.emit("auth error", "Этот никнейм уже используется");
+                        } else {
+                            users.set(socket.id, trimmedNickname);
+                            socket.emit("auth success", trimmedNickname);
+                            console.log(`${trimmedNickname} вошёл`);
+                        }
+                    } else {
+                        socket.emit("auth error", "Неверный пароль");
+                    }
+                });
+            }
+        });
     });
 
     socket.on("join room", (room) => {
-        if (rooms.includes(room)) {
+        if (rooms.includes(room) && users.has(socket.id)) {
             const currentRooms = Array.from(socket.rooms).filter(r => r !== socket.id);
             const oldRoom = currentRooms.length ? currentRooms[0] : null;
 
             if (oldRoom) {
                 socket.leave(oldRoom);
+                console.log(`${users.get(socket.id)} покинул ${oldRoom}`);
                 updateRoomUsers(oldRoom);
             }
 
@@ -162,6 +236,8 @@ io.on("connection", (socket) => {
 
     socket.on("chat message", ({ room, msg, replyTo }) => {
         const username = users.get(socket.id);
+        if (!username) return;
+
         const isMuted = mutedUsers.has(socket.id) && mutedUsers.get(socket.id) > Date.now();
         if (isMuted) {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
@@ -193,7 +269,7 @@ io.on("connection", (socket) => {
 
     socket.on("typing", (room) => {
         const username = users.get(socket.id);
-        io.to(room).emit("typing", username);
+        if (username) io.to(room).emit("typing", username);
     });
 
     socket.on("stop typing", (room) => {
@@ -219,7 +295,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("mute user", ({ room, targetUsername, duration }) => {
-        if (users.get(socket.id)?.toLowerCase() !== "admin") return;
+        if (users.get(socket.id)?.toLowerCase() === "admin") return;
         const targetSocketId = Array.from(users.entries())
             .find(([_, name]) => name.toLowerCase() === targetUsername.toLowerCase())?.[0];
         if (targetSocketId) {
