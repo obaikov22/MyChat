@@ -45,7 +45,8 @@ pool.query(`
         timestamp TEXT NOT NULL,
         message_id TEXT NOT NULL,
         reply_to TEXT,
-        type TEXT NOT NULL
+        type TEXT NOT NULL,
+        media TEXT
     )
 `, (err) => {
     if (err) console.error("Ошибка создания таблицы messages:", err.message);
@@ -110,7 +111,7 @@ const blacklistedNicknames = ["administrator", "админ", "moderator", "мо�
 
 const MAX_MESSAGES = 100;
 const JWT_SECRET = "MySecretPassword123";
-const MAIN_ADMIN_NICKNAME = "Admin"; // Замени на свой ник
+const MAIN_ADMIN_NICKNAME = "Admin";
 
 function generateToken(nickname) {
     return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "1d" });
@@ -167,12 +168,12 @@ async function updateUserList() {
     }
 }
 
-async function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }) {
+async function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type, media }) {
     try {
         await pool.query(
-            `INSERT INTO messages (room, username, msg, timestamp, message_id, reply_to, type) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [room, username, msg, timestamp, messageId, replyTo || null, type]
+            `INSERT INTO messages (room, username, msg, timestamp, message_id, reply_to, type, media) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [room, username, msg, timestamp, messageId, replyTo || null, type, media || null]
         );
         await pool.query(`
             DELETE FROM messages 
@@ -202,7 +203,8 @@ async function getChatHistory(room, socketId) {
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
-            canDelete: userPermissions.deleteMessages
+            canDelete: userPermissions.deleteMessages,
+            media: row.media
         }));
     } catch (err) {
         console.error("Ошибка загрузки истории:", err.message);
@@ -334,7 +336,7 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("chat message", async ({ room, msg, replyTo }) => {
+    socket.on("chat message", async ({ room, msg, replyTo, media }) => {
         const username = users.get(socket.id);
         if (!username) return;
         const isMuted = mutedUsers.has(socket.id) && mutedUsers.get(socket.id) > Date.now();
@@ -348,18 +350,20 @@ io.on("connection", (socket) => {
         const messageData = { 
             room, 
             username, 
-            msg, 
+            msg: msg || "", // Пустое сообщение, если есть только медиа
             timestamp, 
             messageId, 
             replyTo, 
             type: "message",
-            canDelete: permissions.deleteMessages
+            canDelete: permissions.deleteMessages,
+            media
         };
         if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
             if (announcement) {
                 messageData.msg = announcement;
                 messageData.type = "announcement";
+                messageData.media = null; // Объявления без медиа
                 io.to(room).emit("announcement", messageData);
                 await saveMessage(messageData);
             }
