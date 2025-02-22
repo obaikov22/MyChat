@@ -233,7 +233,7 @@
             font-size: 0.95em;
         }
         .users-panel li.offline {
-            color: #999; /* Серый цвет для оффлайн */
+            color: #999;
         }
         .admin-controls {
             margin-top: 15px;
@@ -290,7 +290,6 @@
             margin-top: 10px;
         }
 
-        /* Адаптация для телефонов */
         @media (max-width: 768px) {
             body {
                 align-items: flex-start;
@@ -437,6 +436,12 @@
         socket.off("chat history");
         socket.off("update users");
 
+        // Проверяем токен при загрузке страницы
+        const token = localStorage.getItem("chatToken");
+        if (token) {
+            socket.emit("auto login", token);
+        }
+
         function register() {
             const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
@@ -459,9 +464,10 @@
             }
         }
 
-        socket.on("auth success", (setUsername) => {
-            console.log("Успешная авторизация:", setUsername);
-            username = setUsername;
+        socket.on("auth success", ({ nickname, token }) => {
+            console.log("Успешная авторизация:", nickname);
+            username = nickname;
+            localStorage.setItem("chatToken", token); // Сохраняем токен
             authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
             if (username.toLowerCase() === "admin") {
@@ -473,6 +479,7 @@
         socket.on("auth error", (message) => {
             console.log("Ошибка авторизации:", message);
             authError.innerText = message;
+            localStorage.removeItem("chatToken"); // Удаляем токен при ошибке
         });
 
         socket.on("muted", (message) => {
@@ -640,17 +647,16 @@
         socket.on("update users", ({ users, onlineCount, totalCount }) => {
             console.log("Получены пользователи:", users, "Онлайн:", onlineCount, "Всего:", totalCount);
             usersList.innerHTML = "";
-            // Получаем список активных пользователей из сервера
-            const onlineUsers = users.slice(0, onlineCount); // Первые onlineCount пользователей — онлайн
+            const onlineUsers = users.slice(0, onlineCount);
             users.forEach(user => {
                 const li = document.createElement("li");
                 li.textContent = user;
                 const isOnline = onlineUsers.includes(user);
                 if (!isOnline) {
-                    li.classList.add("offline"); // Серый для оффлайн
+                    li.classList.add("offline");
                 }
                 if (user.toLowerCase() === "admin") {
-                    li.style.color = isOnline ? "#D32F2F" : "#999"; // Красный для админа онлайн, серый для оффлайн
+                    li.style.color = isOnline ? "#D32F2F" : "#999";
                 } else if (username.toLowerCase() === "admin" && isOnline) {
                     const muteIcon = document.createElement("button");
                     muteIcon.innerHTML = "🔇";

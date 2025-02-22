@@ -4,6 +4,7 @@ const { Server } = require("socket.io");
 const path = require("path");
 const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 const server = http.createServer(app);
@@ -66,27 +67,38 @@ const blacklistedNicknames = [
 
 const adminPassword = "MySecretPassword123";
 const MAX_MESSAGES = 100;
+const JWT_SECRET = "MySecretPassword123"; // Секретный ключ для JWT (замени на свой)
+
+function generateToken(nickname) {
+    return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "10m" }); // Токен на 10 минут
+}
+
+async function verifyToken(token) {
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        return decoded.nickname;
+    } catch (err) {
+        console.error("Неверный или истёкший токен:", err.message);
+        return null;
+    }
+}
 
 async function updateUserList() {
     try {
-        // Получаем всех зарегистрированных пользователей из базы
         const allUsersRes = await pool.query(`SELECT nickname FROM users`);
         const allUsers = allUsersRes.rows.map(row => row.nickname);
         console.log("Все пользователи из базы:", allUsers);
 
-        // Получаем активных пользователей
         const onlineUsers = Array.from(users.values());
         console.log("Онлайн пользователи:", onlineUsers);
 
-        // Формируем список с сортировкой (онлайн сверху)
         const userList = allUsers.sort((a, b) => {
             const aOnline = onlineUsers.includes(a);
             const bOnline = onlineUsers.includes(b);
-            return bOnline - aOnline; // Онлайн (1) выше оффлайн (0)
+            return bOnline - aOnline;
         });
         console.log("Отсортированный список:", userList);
 
-        // Отправляем список и статистику всем клиентам
         io.emit("update users", {
             users: userList,
             onlineCount: onlineUsers.length,
@@ -144,7 +156,6 @@ async function getChatHistory(room) {
 io.on("connection", (socket) => {
     console.log("Пользователь подключился:", socket.id);
 
-    // Отправляем список пользователей новому клиенту
     updateUserList();
 
     socket.on("register", async ({ nickname, password }) => {
@@ -173,9 +184,10 @@ io.on("connection", (socket) => {
                     [trimmedNickname, hashedPassword]
                 );
                 users.set(socket.id, trimmedNickname);
-                socket.emit("auth success", trimmedNickname);
+                const token = generateToken(trimmedNickname);
+                socket.emit("auth success", { nickname: trimmedNickname, token });
                 console.log(`Пользователь ${trimmedNickname} успешно зарегистрирован`);
-                updateUserList(); // Обновляем список после регистрации
+                updateUserList();
             }
         } catch (err) {
             console.error("Ошибка регистрации:", err.message);
@@ -204,9 +216,10 @@ io.on("connection", (socket) => {
                         socket.emit("auth error", "Этот никнейм уже используется");
                     } else {
                         users.set(socket.id, trimmedNickname);
-                        socket.emit("auth success", trimmedNickname);
+                        const token = generateToken(trimmedNickname);
+                        socket.emit("auth success", { nickname: trimmedNickname, token });
                         console.log(`${trimmedNickname} вошёл`);
-                        updateUserList(); // Обновляем список после входа
+                        updateUserList();
                     }
                 } else {
                     socket.emit("auth error", "Неверный пароль");
@@ -215,6 +228,22 @@ io.on("connection", (socket) => {
         } catch (err) {
             console.error("Ошибка входа:", err.message);
             socket.emit("auth error", "Ошибка сервера");
+        }
+    });
+
+    socket.on("auto login", async (token) => {
+        const nickname = await verifyToken(token);
+        if (nickname) {
+            if (Array.from(users.values()).includes(nickname)) {
+                socket.emit("auth error", "Этот никнейм уже используется");
+            } else {
+                users.set(socket.id, nickname);
+                socket.emit("auth success", { nickname, token });
+                console.log(`${nickname} вошёл автоматически`);
+                updateUserList();
+            }
+        } else {
+            socket.emit("auth error", "Токен недействителен или истёк");
         }
     });
 
@@ -230,7 +259,7 @@ io.on("connection", (socket) => {
 
             socket.join(room);
             console.log(`${users.get(socket.id)} присоединился к ${room}`);
-            updateUserList(); // Обновляем список при смене комнаты
+            updateUserList();
 
             const history = await getChatHistory(room);
             socket.emit("chat history", history);
@@ -327,7 +356,7 @@ io.on("connection", (socket) => {
         users.delete(socket.id);
         mutedUsers.delete(socket.id);
         console.log(`${username} отключился`);
-        updateUserList(); // Обновляем список при отключении
+        updateUserList();
     });
 });
 
