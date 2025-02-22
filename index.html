@@ -659,6 +659,7 @@
         let username = "";
         let replyingTo = null;
         let userPermissions = {};
+        const userGroups = new Map(); // Храним группы пользователей
 
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
@@ -789,8 +790,16 @@
             }
         }
 
+        function getUserRoleIcon(username) {
+            const groups = userGroups.get(username.toLowerCase()) || [];
+            if (groups.includes("Администратор")) return "👑";
+            if (groups.includes("Модератор")) return "🛡️";
+            return "";
+        }
+
         function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, canDelete }) {
             const isAdmin = msgUsername.toLowerCase() === "admin";
+            const roleIcon = getUserRoleIcon(msgUsername);
             const replyContent = replyTo ? `
                 <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
                     ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
@@ -800,7 +809,7 @@
             return type === "announcement" ? `
                 <div class="announcement" data-message-id="${messageId}">
                     ${replyContent}
-                    <span class="username">${msgUsername} [Объявление]</span>
+                    <span class="username">${roleIcon} ${msgUsername} [Объявление]</span>
                     <span class="timestamp">${timestamp}</span>
                     <p>${msg}</p>
                     ${canDelete ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
@@ -809,7 +818,7 @@
             ` : `
                 <div class="message" data-message-id="${messageId}">
                     ${replyContent}
-                    <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                    <span class="username ${isAdmin ? 'admin' : ''}">${roleIcon} ${msgUsername}</span>
                     <span class="timestamp">${timestamp}</span>
                     <p>${msg}</p>
                     ${canDelete ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
@@ -866,7 +875,8 @@
             const onlineUsers = users.slice(0, onlineCount);
             users.forEach(user => {
                 const li = document.createElement("li");
-                li.textContent = user;
+                const roleIcon = getUserRoleIcon(user);
+                li.textContent = `${roleIcon} ${user}`;
                 li.onclick = () => showProfile(user);
                 const isOnline = onlineUsers.includes(user);
                 if (!isOnline) {
@@ -944,6 +954,7 @@
         }
 
         socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, groups, isOwnProfile, canAssignGroups }) => {
+            userGroups.set(nickname.toLowerCase(), groups || []);
             document.getElementById("profile-nickname").textContent = nickname;
             document.getElementById("profile-avatar").src = avatar;
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
