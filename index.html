@@ -519,43 +519,66 @@
         }
 
         socket.on("chat history", (history) => {
-            let messages = document.getElementById("messages");
-            messages.innerHTML = "";
-            history.forEach(({ type, username, msg, timestamp, messageId, replyTo }) => {
-                const isAdmin = username.toLowerCase() === "admin";
-                const isMeAdmin = username.toLowerCase() === "admin";
-                const replyContent = replyTo ? `
-                    <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
-                        ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
-                        <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
-                    </div>
-                ` : "";
-                if (type === "announcement") {
-                    messages.innerHTML += `
-                        <div class="announcement" data-message-id="${messageId}">
-                            ${replyContent}
-                            <span class="username">${username} [Объявление]</span>
-                            <span class="timestamp">${timestamp}</span>
-                            <p>${msg}</p>
-                            ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                            <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                        </div>
-                    `;
-                } else {
-                    messages.innerHTML += `
-                        <div class="message" data-message-id="${messageId}">
-                            ${replyContent}
-                            <span class="username ${isAdmin ? 'admin' : ''}">${username}</span>
-                            <span class="timestamp">${timestamp}</span>
-                            <p>${msg}</p>
-                            ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                            <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                        </div>
-                    `;
-                }
-            });
-            messages.scrollTop = messages.scrollHeight;
-        });
+    let messages = document.getElementById("messages");
+    messages.innerHTML = ""; // Очищаем перед загрузкой
+    history.forEach(({ type, username, msg, timestamp, messageId, replyTo }) => {
+        const isAdmin = username.toLowerCase() === "admin";
+        const isMeAdmin = username.toLowerCase() === "admin";
+        const replyContent = replyTo ? `
+            <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
+                ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
+                <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
+            </div>
+        ` : "";
+        if (type === "announcement") {
+            messages.innerHTML += `
+                <div class="announcement" data-message-id="${messageId}">
+                    ${replyContent}
+                    <span class="username">${username} [Объявление]</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            `;
+        } else {
+            messages.innerHTML += `
+                <div class="message" data-message-id="${messageId}">
+                    ${replyContent}
+                    <span class="username ${isAdmin ? 'admin' : ''}">${username}</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            `;
+        }
+    });
+    messages.scrollTop = messages.scrollHeight; // Прокручиваем вниз
+});
+
+socket.on("chat message", ({ username: msgUsername, msg, timestamp, messageId, replyTo }) => {
+    let messages = document.getElementById("messages");
+    const isAdmin = msgUsername.toLowerCase() === "admin";
+    const isMeAdmin = username.toLowerCase() === "admin";
+    const replyContent = replyTo ? `
+        <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
+            ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
+            <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
+        </div>
+    ` : "";
+    messages.innerHTML += `
+        <div class="message" data-message-id="${messageId}">
+            ${replyContent}
+            <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+            <span class="timestamp">${timestamp}</span>
+            <p>${msg}</p>
+            ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+            <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+        </div>
+    `;
+    messages.scrollTop = messages.scrollHeight;
+});
 
         socket.on("chat message", ({ username: msgUsername, msg, timestamp, messageId, replyTo }) => {
             let messages = document.getElementById("messages");

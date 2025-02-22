@@ -95,7 +95,7 @@ function getChatHistory(room, callback) {
     db.all(`
         SELECT * FROM messages 
         WHERE room = ? 
-        ORDER BY id DESC 
+        ORDER BY id ASC 
         LIMIT ${MAX_MESSAGES}`,
         [room],
         (err, rows) => {
