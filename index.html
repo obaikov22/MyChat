@@ -957,6 +957,7 @@
         }
 
         socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, groups, isOwnProfile, canAssignGroups }) => {
+            console.log(`"${username}"`, last_seen, groups)
             userGroups.set(nickname.toLowerCase(), groups || []);
             document.getElementById("profile-nickname").textContent = nickname;
             document.getElementById("profile-avatar").src = avatar;
