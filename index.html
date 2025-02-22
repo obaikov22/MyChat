@@ -13,6 +13,7 @@
             align-items: center;
             min-height: 100vh;
             color: #333;
+            overflow-x: hidden;
         }
         .chat-room, .auth-container {
             width: 90%;
@@ -278,6 +279,89 @@
             font-size: 0.9em;
             color: #78909C;
             margin-top: 10px;
+        }
+
+        /* Адаптация для телефонов */
+        @media (max-width: 768px) {
+            body {
+                align-items: flex-start;
+                padding: 10px;
+                min-height: 100vh;
+            }
+            .chat-room, .auth-container {
+                flex-direction: column;
+                width: 100%;
+                padding: 15px;
+                border-radius: 0;
+                box-shadow: none;
+                min-height: 100vh;
+            }
+            .chat-container {
+                width: 100%;
+            }
+            .users-panel {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 15px;
+                padding: 10px;
+                border-radius: 10px;
+            }
+            #messages {
+                height: calc(100vh - 250px); /* Учитываем шапку, ввод и панель */
+                margin-bottom: 15px;
+            }
+            #message-input {
+                width: 100%;
+                padding: 12px 15px;
+                font-size: 16px;
+            }
+            .input-container {
+                flex-direction: row;
+                align-items: center;
+                gap: 5px;
+                padding: 10px 0;
+                background: #FFFFFF;
+            }
+            #emoji-button, button {
+                padding: 12px;
+                font-size: 18px;
+                width: auto;
+                min-width: 50px;
+            }
+            select {
+                width: 100%;
+                margin: 10px 0;
+                padding: 12px 15px;
+                font-size: 16px;
+            }
+            .message, .announcement {
+                max-width: 85%;
+                padding: 10px 15px;
+            }
+            .delete-btn, .reply-btn {
+                padding: 6px 10px;
+                font-size: 14px;
+            }
+            .delete-btn {
+                right: 5px;
+            }
+            .reply-btn {
+                right: 60px;
+            }
+            .auth-container h2 {
+                font-size: 1.5em;
+            }
+            #nickname-input, #password-input {
+                width: 100%;
+                padding: 12px 15px;
+                font-size: 16px;
+            }
+            emoji-picker {
+                bottom: 70px;
+                left: 10px;
+                width: calc(100% - 20px);
+                max-height: 50vh;
+            }
         }
     </style>
 </head>
@@ -580,7 +664,10 @@
         emojiButton.addEventListener("click", () => {
             const isVisible = emojiPicker.style.display === "block";
             emojiPicker.style.display = isVisible ? "none" : "block";
-            if (!isVisible) {
+            if (!isVisible && window.innerWidth <= 768) {
+                emojiPicker.style.bottom = "70px";
+                emojiPicker.style.left = "10px";
+            } else if (!isVisible) {
                 emojiPicker.style.top = `${messageInput.offsetTop - 300}px`;
                 emojiPicker.style.left = `${messageInput.offsetLeft}px`;
             }
