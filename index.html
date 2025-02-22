@@ -312,13 +312,14 @@
             max-width: 300px;
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(155, 89, 182, 0.2);
+            cursor: pointer;
         }
         .media-container video, .media-container audio {
             max-width: 300px;
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(155, 89, 182, 0.2);
         }
-        .modal {
+        .modal, .image-modal {
             display: none;
             position: fixed;
             top: 0;
@@ -335,7 +336,7 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
-        .modal-content {
+        .modal-content, .image-modal-content {
             background: #FFFFFF;
             padding: 20px;
             border-radius: 20px;
@@ -345,6 +346,12 @@
             position: relative;
             transform: translateY(-20px);
             animation: slideIn 0.3s ease forwards;
+        }
+        .image-modal-content {
+            width: auto;
+            max-width: 90%;
+            max-height: 90vh;
+            padding: 10px;
         }
         @keyframes slideIn {
             from { transform: translateY(-50px); opacity: 0; }
@@ -360,6 +367,12 @@
         }
         .modal-content img:hover {
             transform: scale(1.05);
+        }
+        .image-modal-content img {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(155, 89, 182, 0.2);
         }
         .profile-header {
             display: flex;
@@ -564,11 +577,11 @@
                 width: calc(100% - 20px);
                 max-height: 50vh;
             }
-            .modal {
+            .modal, .image-modal {
                 align-items: flex-start;
                 padding-top: 20px;
             }
-            .modal-content {
+            .modal-content, .image-modal-content {
                 width: 100%;
                 max-width: 100%;
                 height: calc(100vh - 40px);
@@ -580,6 +593,10 @@
             .modal-content img {
                 width: 80px;
                 height: 80px;
+            }
+            .image-modal-content img {
+                max-width: 100%;
+                max-height: calc(100vh - 80px);
             }
             .profile-info h4 {
                 font-size: 1.3em;
@@ -668,6 +685,12 @@
             <button id="assign-group-btn" class="admin-btn hidden" onclick="showGroupForm()">Назначить группу</button>
         </div>
     </div>
+    <div id="image-modal" class="image-modal">
+        <div class="image-modal-content">
+            <button class="close-btn" onclick="closeImageModal()">✖</button>
+            <img id="full-image" src="" alt="Full-size image">
+        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/emoji-picker/index.js" type="module"></script>
@@ -693,6 +716,8 @@
         const userCount = document.getElementById("user-count");
         const adminControls = document.getElementById("admin-controls");
         const profileModal = document.getElementById("profile-modal");
+        const imageModal = document.getElementById("image-modal");
+        const fullImage = document.getElementById("full-image");
         const cancelReplyBtn = document.getElementById("cancel-reply-btn");
 
         socket.off("chat message");
@@ -759,6 +784,7 @@
             if (file) {
                 if (file.size > 10 * 1024 * 1024) { // 10 MB
                     alert("Файл слишком большой (макс. 10 МБ)");
+                    fileInput.value = "";
                     return;
                 }
                 const reader = new FileReader();
@@ -774,6 +800,10 @@
                     replyingTo = null;
                     messageInput.placeholder = "Напиши сообщение...";
                     cancelReplyBtn.classList.add("hidden");
+                };
+                reader.onerror = () => {
+                    alert("Ошибка чтения файла");
+                    fileInput.value = "";
                 };
                 reader.readAsDataURL(file);
             } else {
@@ -839,6 +869,16 @@
             }
         }
 
+        function showImageModal(src) {
+            fullImage.src = src;
+            imageModal.style.display = "flex";
+        }
+
+        function closeImageModal() {
+            imageModal.style.display = "none";
+            fullImage.src = "";
+        }
+
         function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, canDelete, media }) {
             const isAdmin = msgUsername.toLowerCase() === "admin";
             const replyContent = replyTo ? `
@@ -850,7 +890,7 @@
             let mediaContent = "";
             if (media) {
                 if (media.startsWith("data:image/")) {
-                    mediaContent = `<div class="media-container"><img src="${media}" alt="Attached image"></div>`;
+                    mediaContent = `<div class="media-container"><img src="${media}" alt="Attached image" onclick="showImageModal('${media}')"></div>`;
                 } else if (media.startsWith("data:video/")) {
                     mediaContent = `<div class="media-container"><video controls src="${media}"></video></div>`;
                 } else if (media.startsWith("data:audio/")) {
@@ -1016,7 +1056,7 @@
             for (const item of items) {
                 if (item.type.indexOf("image") === 0) {
                     const blob = item.getAsFile();
-                    if (blob.size > 10 * 1024 * 1024) { // 10 MB
+                    if (blob.size > 10 * 1024 * 1024) {
                         alert("Изображение слишком большое (макс. 10 МБ)");
                         return;
                     }

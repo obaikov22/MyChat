@@ -8,7 +8,9 @@ const jwt = require("jsonwebtoken");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    maxHttpBufferSize: 1e7 // Увеличиваем лимит до 10 МБ
+});
 
 const pool = new Pool({
     connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7",
@@ -51,6 +53,13 @@ pool.query(`
 `, (err) => {
     if (err) console.error("Ошибка создания таблицы messages:", err.message);
     else console.log("Таблица messages готова");
+});
+
+pool.query(`
+    ALTER TABLE messages ADD COLUMN IF NOT EXISTS media TEXT
+`, (err) => {
+    if (err) console.error("Ошибка добавления колонки media:", err.message);
+    else console.log("Колонка media добавлена или уже существует");
 });
 
 pool.query(`
@@ -350,7 +359,7 @@ io.on("connection", (socket) => {
         const messageData = { 
             room, 
             username, 
-            msg: msg || "", // Пустое сообщение, если есть только медиа
+            msg: msg || "", 
             timestamp, 
             messageId, 
             replyTo, 
@@ -363,7 +372,7 @@ io.on("connection", (socket) => {
             if (announcement) {
                 messageData.msg = announcement;
                 messageData.type = "announcement";
-                messageData.media = null; // Объявления без медиа
+                messageData.media = null;
                 io.to(room).emit("announcement", messageData);
                 await saveMessage(messageData);
             }
