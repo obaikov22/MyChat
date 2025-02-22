@@ -212,6 +212,12 @@
             font-size: 1.2em;
             color: #9B59B6;
             font-weight: 600;
+            display: inline;
+        }
+        #user-count {
+            font-size: 0.9em;
+            color: #78909C;
+            margin-left: 10px;
         }
         .users-panel ul {
             list-style: none;
@@ -225,6 +231,9 @@
             justify-content: space-between;
             align-items: center;
             font-size: 0.95em;
+        }
+        .users-panel li.offline {
+            color: #999; /* Серый цвет для оффлайн */
         }
         .admin-controls {
             margin-top: 15px;
@@ -396,7 +405,7 @@
             <emoji-picker id="emoji-picker"></emoji-picker>
         </div>
         <div class="users-panel">
-            <h3>Пользователи</h3>
+            <h3>Пользователи <span id="user-count">0/0</span></h3>
             <ul id="users-list"></ul>
             <div class="admin-controls hidden" id="admin-controls">
                 <button class="admin-btn" onclick="clearChat()">Очистить чат</button>
@@ -421,9 +430,9 @@
         const authContainer = document.querySelector(".auth-container");
         const authError = document.getElementById("auth-error");
         const usersList = document.getElementById("users-list");
+        const userCount = document.getElementById("user-count");
         const adminControls = document.getElementById("admin-controls");
 
-        // Очищаем старые обработчики при загрузке
         socket.off("chat message");
         socket.off("chat history");
         socket.off("update users");
@@ -628,14 +637,19 @@
             alert(`${username} забанен`);
         });
 
-        socket.on("update users", (roomUsers) => {
+        socket.on("update users", ({ users, onlineCount, totalCount }) => {
             usersList.innerHTML = "";
-            roomUsers.forEach(user => {
+            const onlineUsers = Array.from(socket.io.engine.clients.keys()).map(id => users.get(id)).filter(Boolean);
+            users.forEach(user => {
                 const li = document.createElement("li");
                 li.textContent = user;
+                const isOnline = onlineUsers.includes(user);
+                if (!isOnline) {
+                    li.classList.add("offline"); // Добавляем класс для оффлайн пользователей
+                }
                 if (user.toLowerCase() === "admin") {
-                    li.style.color = "#D32F2F";
-                } else if (username.toLowerCase() === "admin") {
+                    li.style.color = isOnline ? "#D32F2F" : "#999"; // Красный для админа онлайн, серый для оффлайн
+                } else if (username.toLowerCase() === "admin" && isOnline) {
                     const muteIcon = document.createElement("button");
                     muteIcon.innerHTML = "🔇";
                     muteIcon.className = "admin-icon";
@@ -651,6 +665,7 @@
                 }
                 usersList.appendChild(li);
             });
+            userCount.innerText = `${onlineCount}/${totalCount}`;
         });
 
         let typingTimeout;

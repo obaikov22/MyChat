@@ -58,7 +58,7 @@ app.get("/", (req, res) => {
 app.use("/emoji-picker", express.static(path.join(__dirname, "node_modules/emoji-picker-element")));
 
 const rooms = ["room1", "room2"];
-const users = new Map();
+const users = new Map(); // Активные пользователи (socket.id -> nickname)
 const mutedUsers = new Map();
 const blacklistedNicknames = [
     "administrator", "админ", "moderator", "модератор", "root", "superuser"
@@ -67,12 +67,32 @@ const blacklistedNicknames = [
 const adminPassword = "MySecretPassword123";
 const MAX_MESSAGES = 100;
 
-function updateRoomUsers(room) {
-    const roomUsers = Array.from(io.sockets.adapter.rooms.get(room) || [])
-        .map(socketId => users.get(socketId))
-        .filter(username => username);
-    io.to(room).emit("update users", roomUsers);
-    console.log(`Обновлён список пользователей в ${room}: ${roomUsers}`);
+async function updateUserList() {
+    try {
+        // Получаем всех зарегистрированных пользователей из базы
+        const allUsersRes = await pool.query(`SELECT nickname FROM users`);
+        const allUsers = allUsersRes.rows.map(row => row.nickname);
+        
+        // Получаем активных пользователей
+        const onlineUsers = Array.from(users.values());
+        
+        // Формируем список с сортировкой (онлайн сверху)
+        const userList = allUsers.sort((a, b) => {
+            const aOnline = onlineUsers.includes(a);
+            const bOnline = onlineUsers.includes(b);
+            return (bOnline - aOnline); // Онлайн (1) выше оффлайн (0)
+        });
+
+        // Отправляем список и статистику всем клиентам
+        io.emit("update users", {
+            users: userList,
+            onlineCount: onlineUsers.length,
+            totalCount: allUsers.length
+        });
+        console.log(`Обновлён список пользователей: онлайн ${onlineUsers.length}/${allUsers.length}`);
+    } catch (err) {
+        console.error("Ошибка обновления списка пользователей:", err.message);
+    }
 }
 
 async function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }) {
@@ -121,6 +141,9 @@ async function getChatHistory(room) {
 io.on("connection", (socket) => {
     console.log("Пользователь подключился:", socket.id);
 
+    // Отправляем список пользователей новому клиенту
+    updateUserList();
+
     socket.on("register", async ({ nickname, password }) => {
         console.log(`Регистрация: ${nickname}`);
         const trimmedNickname = nickname.trim();
@@ -149,6 +172,7 @@ io.on("connection", (socket) => {
                 users.set(socket.id, trimmedNickname);
                 socket.emit("auth success", trimmedNickname);
                 console.log(`Пользователь ${trimmedNickname} успешно зарегистрирован`);
+                updateUserList(); // Обновляем список после регистрации
             }
         } catch (err) {
             console.error("Ошибка регистрации:", err.message);
@@ -179,6 +203,7 @@ io.on("connection", (socket) => {
                         users.set(socket.id, trimmedNickname);
                         socket.emit("auth success", trimmedNickname);
                         console.log(`${trimmedNickname} вошёл`);
+                        updateUserList(); // Обновляем список после входа
                     }
                 } else {
                     socket.emit("auth error", "Неверный пароль");
@@ -198,12 +223,11 @@ io.on("connection", (socket) => {
             if (oldRoom) {
                 socket.leave(oldRoom);
                 console.log(`${users.get(socket.id)} покинул ${oldRoom}`);
-                updateRoomUsers(oldRoom);
             }
 
             socket.join(room);
             console.log(`${users.get(socket.id)} присоединился к ${room}`);
-            updateRoomUsers(room);
+            updateUserList(); // Обновляем список при смене комнаты
 
             const history = await getChatHistory(room);
             socket.emit("chat history", history);
@@ -300,14 +324,7 @@ io.on("connection", (socket) => {
         users.delete(socket.id);
         mutedUsers.delete(socket.id);
         console.log(`${username} отключился`);
-        // Принудительно обновляем список пользователей во всех комнатах
-        currentRooms.forEach(room => {
-            updateRoomUsers(room);
-            // Дополнительно отправляем событие всем клиентам в комнате
-            io.to(room).emit("update users", Array.from(io.sockets.adapter.rooms.get(room) || [])
-                .map(socketId => users.get(socketId))
-                .filter(username => username));
-        });
+        updateUserList(); // Обновляем список при отключении
     });
 });
 
