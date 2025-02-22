@@ -782,6 +782,8 @@
             if (!msg && !file) return;
 
             if (file) {
+                const fileSizeKB = file.size / 1024;
+                console.log(`Загружаю файл: ${file.name}, размер: ${fileSizeKB.toFixed(2)} КБ`);
                 if (file.size > 10 * 1024 * 1024) { // 10 MB
                     alert("Файл слишком большой (макс. 10 МБ)");
                     fileInput.value = "";
@@ -789,6 +791,7 @@
                 }
                 const reader = new FileReader();
                 reader.onload = () => {
+                    console.log("Файл прочитан, отправляю на сервер");
                     socket.emit("chat message", { 
                         room: currentRoom, 
                         msg, 
@@ -802,6 +805,7 @@
                     cancelReplyBtn.classList.add("hidden");
                 };
                 reader.onerror = () => {
+                    console.error("Ошибка чтения файла");
                     alert("Ошибка чтения файла");
                     fileInput.value = "";
                 };
@@ -1056,12 +1060,15 @@
             for (const item of items) {
                 if (item.type.indexOf("image") === 0) {
                     const blob = item.getAsFile();
+                    const fileSizeKB = blob.size / 1024;
+                    console.log(`Вставка из буфера, размер: ${fileSizeKB.toFixed(2)} КБ`);
                     if (blob.size > 10 * 1024 * 1024) {
                         alert("Изображение слишком большое (макс. 10 МБ)");
                         return;
                     }
                     const reader = new FileReader();
                     reader.onload = () => {
+                        console.log("Изображение из буфера прочитано, отправляю");
                         socket.emit("chat message", { 
                             room: currentRoom, 
                             msg: messageInput.value.trim(), 
@@ -1072,6 +1079,10 @@
                         replyingTo = null;
                         messageInput.placeholder = "Напиши сообщение...";
                         cancelReplyBtn.classList.add("hidden");
+                    };
+                    reader.onerror = () => {
+                        console.error("Ошибка чтения изображения из буфера");
+                        alert("Ошибка чтения изображения");
                     };
                     reader.readAsDataURL(blob);
                     event.preventDefault();
