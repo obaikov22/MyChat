@@ -710,9 +710,6 @@
             localStorage.setItem("chatToken", token);
             authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
-            if (username.toLowerCase() === "admin") { // Пока оставим для обратной совместимости
-                adminControls.classList.remove("hidden");
-            }
             joinRoom();
         });
 
@@ -787,90 +784,56 @@
             }
         }
 
+        function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, canDelete }) {
+            const isAdmin = msgUsername.toLowerCase() === "admin";
+            const replyContent = replyTo ? `
+                <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
+                    ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
+                    <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
+                </div>
+            ` : "";
+            return type === "announcement" ? `
+                <div class="announcement" data-message-id="${messageId}">
+                    ${replyContent}
+                    <span class="username">${msgUsername} [Объявление]</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${canDelete ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            ` : `
+                <div class="message" data-message-id="${messageId}">
+                    ${replyContent}
+                    <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${canDelete ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            `;
+        }
+
         socket.on("chat history", (history) => {
             let messages = document.getElementById("messages");
             messages.innerHTML = "";
-            history.forEach(({ type, username, msg, timestamp, messageId, replyTo }) => {
-                const isAdmin = username.toLowerCase() === "admin";
-                const isMeAdmin = username.toLowerCase() === "admin"; // Пока для обратной совместимости
-                const replyContent = replyTo ? `
-                    <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
-                        ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
-                        <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
-                    </div>
-                ` : "";
-                if (type === "announcement") {
-                    messages.innerHTML += `
-                        <div class="announcement" data-message-id="${messageId}">
-                            ${replyContent}
-                            <span class="username">${username} [Объявление]</span>
-                            <span class="timestamp">${timestamp}</span>
-                            <p>${msg}</p>
-                            ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                            <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                        </div>
-                    `;
-                } else {
-                    messages.innerHTML += `
-                        <div class="message" data-message-id="${messageId}">
-                            ${replyContent}
-                            <span class="username ${isAdmin ? 'admin' : ''}">${username}</span>
-                            <span class="timestamp">${timestamp}</span>
-                            <p>${msg}</p>
-                            ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                            <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                        </div>
-                    `;
-                }
+            history.forEach(message => {
+                messages.innerHTML += renderMessage(message);
             });
             messages.scrollTop = messages.scrollHeight;
         });
 
-        socket.on("chat message", ({ username: msgUsername, msg, timestamp, messageId, replyTo }) => {
+        socket.on("chat message", (messageData) => {
             let messages = document.getElementById("messages");
-            const isAdmin = msgUsername.toLowerCase() === "admin";
-            const isMeAdmin = username.toLowerCase() === "admin";
-            const replyContent = replyTo ? `
-                <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
-                    ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
-                    <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
-                </div>
-            ` : "";
-            if (!document.querySelector(`[data-message-id="${messageId}"]`)) {
-                messages.innerHTML += `
-                    <div class="message" data-message-id="${messageId}">
-                        ${replyContent}
-                        <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
-                        <span class="timestamp">${timestamp}</span>
-                        <p>${msg}</p>
-                        ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                        <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                    </div>
-                `;
+            if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
+                messages.innerHTML += renderMessage(messageData);
                 messages.scrollTop = messages.scrollHeight;
             }
         });
 
-        socket.on("announcement", ({ username, msg, timestamp, messageId, replyTo }) => {
+        socket.on("announcement", (messageData) => {
             let messages = document.getElementById("messages");
-            const isMeAdmin = username.toLowerCase() === "admin";
-            const replyContent = replyTo ? `
-                <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
-                    ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
-                    <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
-                </div>
-            ` : "";
-            if (!document.querySelector(`[data-message-id="${messageId}"]`)) {
-                messages.innerHTML += `
-                    <div class="announcement" data-message-id="${messageId}">
-                        ${replyContent}
-                        <span class="username">${username} [Объявление]</span>
-                        <span class="timestamp">${timestamp}</span>
-                        <p>${msg}</p>
-                        ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                        <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                    </div>
-                `;
+            if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
+                messages.innerHTML += renderMessage(messageData);
                 messages.scrollTop = messages.scrollHeight;
             }
         });
@@ -966,7 +929,6 @@
             messageInput.focus();
         });
 
-        // Profile Modal Functions
         function showProfile(targetUsername) {
             socket.emit("get profile", targetUsername);
         }

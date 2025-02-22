@@ -20,7 +20,6 @@ pool.connect((err) => {
     else console.log("Подключено к PostgreSQL");
 });
 
-// Обновляем таблицу users
 pool.query(`
     CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -37,7 +36,6 @@ pool.query(`
     else console.log("Таблица users готова");
 });
 
-// Таблица сообщений
 pool.query(`
     CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
@@ -54,7 +52,6 @@ pool.query(`
     else console.log("Таблица messages готова");
 });
 
-// Таблица групп
 pool.query(`
     CREATE TABLE IF NOT EXISTS groups (
         id SERIAL PRIMARY KEY,
@@ -66,7 +63,6 @@ pool.query(`
     else console.log("Таблица groups готова");
 });
 
-// Таблица связи пользователей и групп
 pool.query(`
     CREATE TABLE IF NOT EXISTS user_groups (
         user_id INTEGER REFERENCES users(id),
@@ -78,7 +74,6 @@ pool.query(`
     else console.log("Таблица user_groups готова");
 });
 
-// Таблица достижений
 pool.query(`
     CREATE TABLE IF NOT EXISTS achievements (
         id SERIAL PRIMARY KEY,
@@ -90,7 +85,6 @@ pool.query(`
     else console.log("Таблица achievements готова");
 });
 
-// Инициализация групп (выполняется один раз)
 async function initializeGroups() {
     const groups = [
         { name: "Администратор", permissions: { deleteMessages: true, clearChat: true, muteUsers: true, banUsers: true, assignGroups: false } },
@@ -193,20 +187,22 @@ async function saveMessage({ room, username, msg, timestamp, messageId, replyTo,
     }
 }
 
-async function getChatHistory(room) {
+async function getChatHistory(room, socketId) {
     try {
         const res = await pool.query(`
             SELECT * FROM messages 
             WHERE room = $1 
             ORDER BY id ASC 
             LIMIT ${MAX_MESSAGES}`, [room]);
+        const userPermissions = await getUserPermissions(users.get(socketId));
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
             timestamp: row.timestamp,
             messageId: row.message_id,
             replyTo: row.reply_to,
-            type: row.type
+            type: row.type,
+            canDelete: userPermissions.deleteMessages // Добавляем право удаления
         }));
     } catch (err) {
         console.error("Ошибка загрузки истории:", err.message);
@@ -267,7 +263,7 @@ io.on("connection", (socket) => {
                 socket.emit("auth error", "Этот никнейм уже зарегистрирован, используйте вход");
             } else {
                 const hashedPassword = await bcrypt.hash(password, 10);
-                const isMainAdmin = trimmedNickname === MAIN_ADMIN_NICKNAME; // Ты — главный админ
+                const isMainAdmin = trimmedNickname === MAIN_ADMIN_NICKNAME;
                 await pool.query(
                     `INSERT INTO users (nickname, password, last_seen, is_main_admin) VALUES ($1, $2, CURRENT_TIMESTAMP, $3)`,
                     [trimmedNickname, hashedPassword, isMainAdmin]
@@ -346,7 +342,7 @@ io.on("connection", (socket) => {
             socket.join(room);
             console.log(`${users.get(socket.id)} присоединился к ${room}`);
             updateUserList();
-            const history = await getChatHistory(room);
+            const history = await getChatHistory(room, socket.id);
             socket.emit("chat history", history);
         }
     });
@@ -361,9 +357,18 @@ io.on("connection", (socket) => {
         }
         const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-        const messageData = { room, username, msg, timestamp, messageId, replyTo, type: "message" };
         const permissions = await getUserPermissions(username);
-        if (permissions.assignGroups && msg.startsWith("/add ")) { // Только главный админ может делать объявления через /add
+        const messageData = { 
+            room, 
+            username, 
+            msg, 
+            timestamp, 
+            messageId, 
+            replyTo, 
+            type: "message",
+            canDelete: permissions.deleteMessages // Добавляем право удаления
+        };
+        if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
             if (announcement) {
                 messageData.msg = announcement;
