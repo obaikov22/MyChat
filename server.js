@@ -11,11 +11,10 @@ const io = new Server(server);
 
 // Подключаемся к PostgreSQL (замени URL на свой из Render)
 const pool = new Pool({
-    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7", // Вставь Internal Database URL из Render
-    ssl: { rejectUnauthorized: false } // Для Render требуется SSL
+    connectionString: "postgres://chat_user:your_password@your_host:5432/chat", // Вставь Internal Database URL из Render
+    ssl: { rejectUnauthorized: false }
 });
 
-// Проверяем подключение
 pool.connect((err) => {
     if (err) {
         console.error("Ошибка подключения к PostgreSQL:", err.message);
@@ -85,7 +84,6 @@ async function saveMessage({ room, username, msg, timestamp, messageId, replyTo,
         );
         console.log("Сообщение сохранено");
 
-        // Удаляем старые сообщения, оставляем только последние MAX_MESSAGES
         await pool.query(`
             DELETE FROM messages 
             WHERE room = $1 AND id NOT IN (
@@ -302,6 +300,7 @@ io.on("connection", (socket) => {
         users.delete(socket.id);
         mutedUsers.delete(socket.id);
         console.log(`${username} отключился`);
+        // Обновляем список пользователей сразу после отключения
         currentRooms.forEach(room => updateRoomUsers(room));
     });
 });
