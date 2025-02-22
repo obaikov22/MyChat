@@ -974,6 +974,14 @@
                     const span = document.createElement("span");
                     span.className = "achievement";
                     span.textContent = group;
+                    span.style = `
+background: linear-gradient(135deg, #E8DAEF, #D1C4E9);
+padding: 6px 12px;
+border-radius: 20px;
+font-size: 0.85em;
+color: ${group.toLowerCase() === "администратор" ? "#FF0000" : group.toLowerCase() === "модератор" ? "#9B59B6" : "#FFFFFF"};
+font-weight: 500;
+box-shadow: 0 2px 5px rgba(155, 89, 182, 0.2);`
                     achievementsEl.appendChild(span);
                 });
             }
