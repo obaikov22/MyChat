@@ -2,41 +2,54 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
+const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const db = new sqlite3.Database("./chat.db", (err) => {
+// Подключаемся к PostgreSQL (замени URL на свой из Render)
+const pool = new Pool({
+    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7", // Вставь Internal Database URL из Render
+    ssl: { rejectUnauthorized: false } // Для Render требуется SSL
+});
+
+// Проверяем подключение
+pool.connect((err) => {
     if (err) {
-        console.error("Ошибка подключения к базе данных:", err.message);
+        console.error("Ошибка подключения к PostgreSQL:", err.message);
     } else {
-        console.log("Подключено к базе данных SQLite");
+        console.log("Подключено к PostgreSQL");
     }
 });
 
-db.serialize(() => {
-    db.run(`
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nickname TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    `);
-    db.run(`
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            room TEXT NOT NULL,
-            username TEXT NOT NULL,
-            msg TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            messageId TEXT NOT NULL,
-            replyTo TEXT,
-            type TEXT NOT NULL
-        )
-    `);
+// Создаём таблицы
+pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        nickname TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL
+    )
+`, (err) => {
+    if (err) console.error("Ошибка создания таблицы users:", err.message);
+    else console.log("Таблица users готова");
+});
+
+pool.query(`
+    CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        room TEXT NOT NULL,
+        username TEXT NOT NULL,
+        msg TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        reply_to TEXT,
+        type TEXT NOT NULL
+    )
+`, (err) => {
+    if (err) console.error("Ошибка создания таблицы messages:", err.message);
+    else console.log("Таблица messages готова");
 });
 
 app.get("/", (req, res) => {
@@ -63,63 +76,54 @@ function updateRoomUsers(room) {
     console.log(`Обновлён список пользователей в ${room}: ${roomUsers}`);
 }
 
-function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }, callback) {
-    db.run(
-        `INSERT INTO messages (room, username, msg, timestamp, messageId, replyTo, type) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [room, username, msg, timestamp, messageId, replyTo || null, type],
-        (err) => {
-            if (err) {
-                console.error("Ошибка сохранения сообщения:", err.message);
-                callback(err);
-            } else {
-                db.run(`
-                    DELETE FROM messages 
-                    WHERE room = ? AND id NOT IN (
-                        SELECT id FROM messages 
-                        WHERE room = ? 
-                        ORDER BY id DESC 
-                        LIMIT ${MAX_MESSAGES}
-                    )`,
-                    [room, room],
-                    (err) => {
-                        if (err) console.error("Ошибка удаления старых сообщений:", err.message);
-                        callback(null);
-                    }
-                );
-            }
-        }
-    );
+async function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }) {
+    try {
+        await pool.query(
+            `INSERT INTO messages (room, username, msg, timestamp, message_id, reply_to, type) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [room, username, msg, timestamp, messageId, replyTo || null, type]
+        );
+        console.log("Сообщение сохранено");
+
+        // Удаляем старые сообщения, оставляем только последние MAX_MESSAGES
+        await pool.query(`
+            DELETE FROM messages 
+            WHERE room = $1 AND id NOT IN (
+                SELECT id FROM messages 
+                WHERE room = $1 
+                ORDER BY id DESC 
+                LIMIT ${MAX_MESSAGES}
+            )`, [room]);
+    } catch (err) {
+        console.error("Ошибка сохранения сообщения:", err.message);
+    }
 }
 
-function getChatHistory(room, callback) {
-    db.all(`
-        SELECT * FROM messages 
-        WHERE room = ? 
-        ORDER BY id ASC 
-        LIMIT ${MAX_MESSAGES}`,
-        [room],
-        (err, rows) => {
-            if (err) {
-                console.error("Ошибка загрузки истории:", err.message);
-                callback([]);
-            } else {
-                callback(rows.map(row => ({
-                    username: row.username,
-                    msg: row.msg,
-                    timestamp: row.timestamp,
-                    messageId: row.messageId,
-                    replyTo: row.replyTo,
-                    type: row.type
-                })));
-            }
-        }
-    );
+async function getChatHistory(room) {
+    try {
+        const res = await pool.query(`
+            SELECT * FROM messages 
+            WHERE room = $1 
+            ORDER BY id ASC 
+            LIMIT ${MAX_MESSAGES}`, [room]);
+        return res.rows.map(row => ({
+            username: row.username,
+            msg: row.msg,
+            timestamp: row.timestamp,
+            messageId: row.message_id,
+            replyTo: row.reply_to,
+            type: row.type
+        }));
+    } catch (err) {
+        console.error("Ошибка загрузки истории:", err.message);
+        return [];
+    }
 }
 
 io.on("connection", (socket) => {
     console.log("Пользователь подключился:", socket.id);
 
-    socket.on("register", ({ nickname, password }) => {
+    socket.on("register", async ({ nickname, password }) => {
         console.log(`Регистрация: ${nickname}`);
         const trimmedNickname = nickname.trim();
         const lowerNickname = trimmedNickname.toLowerCase();
@@ -134,43 +138,27 @@ io.on("connection", (socket) => {
             return;
         }
 
-        db.get(`SELECT * FROM users WHERE nickname = ?`, [trimmedNickname], (err, row) => {
-            if (err) {
-                console.error("Ошибка проверки ника:", err.message);
-                socket.emit("auth error", "Ошибка сервера");
-                return;
-            }
-
-            if (row) {
+        try {
+            const res = await pool.query(`SELECT * FROM users WHERE nickname = $1`, [trimmedNickname]);
+            if (res.rows.length > 0) {
                 socket.emit("auth error", "Этот никнейм уже зарегистрирован, используйте вход");
             } else {
-                bcrypt.hash(password, 10, (err, hashedPassword) => {
-                    if (err) {
-                        console.error("Ошибка хеширования пароля:", err.message);
-                        socket.emit("auth error", "Ошибка сервера");
-                        return;
-                    }
-
-                    db.run(
-                        `INSERT INTO users (nickname, password) VALUES (?, ?)`,
-                        [trimmedNickname, hashedPassword],
-                        (err) => {
-                            if (err) {
-                                console.error("Ошибка регистрации:", err.message);
-                                socket.emit("auth error", "Ошибка сервера");
-                            } else {
-                                users.set(socket.id, trimmedNickname);
-                                socket.emit("auth success", trimmedNickname);
-                                console.log(`Зарегистрирован ${trimmedNickname}`);
-                            }
-                        }
-                    );
-                });
+                const hashedPassword = await bcrypt.hash(password, 10);
+                await pool.query(
+                    `INSERT INTO users (nickname, password) VALUES ($1, $2)`,
+                    [trimmedNickname, hashedPassword]
+                );
+                users.set(socket.id, trimmedNickname);
+                socket.emit("auth success", trimmedNickname);
+                console.log(`Пользователь ${trimmedNickname} успешно зарегистрирован`);
             }
-        });
+        } catch (err) {
+            console.error("Ошибка регистрации:", err.message);
+            socket.emit("auth error", "Ошибка сервера");
+        }
     });
 
-    socket.on("login", ({ nickname, password }) => {
+    socket.on("login", async ({ nickname, password }) => {
         console.log(`Вход: ${nickname}`);
         const trimmedNickname = nickname.trim();
         const lowerNickname = trimmedNickname.toLowerCase();
@@ -180,40 +168,31 @@ io.on("connection", (socket) => {
             return;
         }
 
-        db.get(`SELECT * FROM users WHERE nickname = ?`, [trimmedNickname], (err, row) => {
-            if (err) {
-                console.error("Ошибка проверки ника:", err.message);
-                socket.emit("auth error", "Ошибка сервера");
-                return;
-            }
-
-            if (!row) {
+        try {
+            const res = await pool.query(`SELECT * FROM users WHERE nickname = $1`, [trimmedNickname]);
+            if (res.rows.length === 0) {
                 socket.emit("auth error", "Этот никнейм не зарегистрирован");
             } else {
-                bcrypt.compare(password, row.password, (err, match) => {
-                    if (err) {
-                        console.error("Ошибка проверки пароля:", err.message);
-                        socket.emit("auth error", "Ошибка сервера");
-                        return;
-                    }
-
-                    if (match) {
-                        if (Array.from(users.values()).includes(trimmedNickname)) {
-                            socket.emit("auth error", "Этот никнейм уже используется");
-                        } else {
-                            users.set(socket.id, trimmedNickname);
-                            socket.emit("auth success", trimmedNickname);
-                            console.log(`${trimmedNickname} вошёл`);
-                        }
+                const match = await bcrypt.compare(password, res.rows[0].password);
+                if (match) {
+                    if (Array.from(users.values()).includes(trimmedNickname)) {
+                        socket.emit("auth error", "Этот никнейм уже используется");
                     } else {
-                        socket.emit("auth error", "Неверный пароль");
+                        users.set(socket.id, trimmedNickname);
+                        socket.emit("auth success", trimmedNickname);
+                        console.log(`${trimmedNickname} вошёл`);
                     }
-                });
+                } else {
+                    socket.emit("auth error", "Неверный пароль");
+                }
             }
-        });
+        } catch (err) {
+            console.error("Ошибка входа:", err.message);
+            socket.emit("auth error", "Ошибка сервера");
+        }
     });
 
-    socket.on("join room", (room) => {
+    socket.on("join room", async (room) => {
         if (rooms.includes(room) && users.has(socket.id)) {
             const currentRooms = Array.from(socket.rooms).filter(r => r !== socket.id);
             const oldRoom = currentRooms.length ? currentRooms[0] : null;
@@ -228,13 +207,12 @@ io.on("connection", (socket) => {
             console.log(`${users.get(socket.id)} присоединился к ${room}`);
             updateRoomUsers(room);
 
-            getChatHistory(room, (history) => {
-                socket.emit("chat history", history);
-            });
+            const history = await getChatHistory(room);
+            socket.emit("chat history", history);
         }
     });
 
-    socket.on("chat message", ({ room, msg, replyTo }) => {
+    socket.on("chat message", async ({ room, msg, replyTo }) => {
         const username = users.get(socket.id);
         if (!username) return;
 
@@ -254,17 +232,13 @@ io.on("connection", (socket) => {
                 messageData.msg = announcement;
                 messageData.type = "announcement";
                 io.to(room).emit("announcement", messageData);
-                saveMessage(messageData, (err) => {
-                    if (!err) console.log("Объявление сохранено");
-                });
+                await saveMessage(messageData);
             }
             return;
         }
 
         io.to(room).emit("chat message", messageData);
-        saveMessage(messageData, (err) => {
-            if (!err) console.log("Сообщение сохранено");
-        });
+        await saveMessage(messageData);
     });
 
     socket.on("typing", (room) => {
@@ -276,26 +250,32 @@ io.on("connection", (socket) => {
         io.to(room).emit("stop typing");
     });
 
-    socket.on("delete message", ({ room, messageId }) => {
+    socket.on("delete message", async ({ room, messageId }) => {
         if (users.get(socket.id)?.toLowerCase() === "admin") {
             io.to(room).emit("message deleted", messageId);
-            db.run(`DELETE FROM messages WHERE messageId = ?`, [messageId], (err) => {
-                if (err) console.error("Ошибка удаления сообщения:", err.message);
-            });
+            try {
+                await pool.query(`DELETE FROM messages WHERE message_id = $1`, [messageId]);
+                console.log(`Сообщение ${messageId} удалено`);
+            } catch (err) {
+                console.error("Ошибка удаления сообщения:", err.message);
+            }
         }
     });
 
-    socket.on("clear chat", (room) => {
+    socket.on("clear chat", async (room) => {
         if (users.get(socket.id)?.toLowerCase() === "admin") {
             io.to(room).emit("chat cleared");
-            db.run(`DELETE FROM messages WHERE room = ?`, [room], (err) => {
-                if (err) console.error("Ошибка очистки чата:", err.message);
-            });
+            try {
+                await pool.query(`DELETE FROM messages WHERE room = $1`, [room]);
+                console.log(`Чат в комнате ${room} очищен`);
+            } catch (err) {
+                console.error("Ошибка очистки чата:", err.message);
+            }
         }
     });
 
     socket.on("mute user", ({ room, targetUsername, duration }) => {
-        if (users.get(socket.id)?.toLowerCase() === "admin") return;
+        if (users.get(socket.id)?.toLowerCase() !== "admin") return;
         const targetSocketId = Array.from(users.entries())
             .find(([_, name]) => name.toLowerCase() === targetUsername.toLowerCase())?.[0];
         if (targetSocketId) {
@@ -327,9 +307,8 @@ io.on("connection", (socket) => {
 });
 
 process.on("SIGINT", () => {
-    db.close((err) => {
-        if (err) console.error("Ошибка закрытия базы данных:", err.message);
-        console.log("База данных закрыта");
+    pool.end(() => {
+        console.log("Соединение с PostgreSQL закрыто");
         process.exit(0);
     });
 });
