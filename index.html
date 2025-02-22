@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Мой чат</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Для адаптивности на телефоне -->
     <style>
         body {
             background: linear-gradient(135deg, #E8DAEF, #F5F5F5);
@@ -185,6 +186,8 @@
         .input-container {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .hidden {
             display: none;
@@ -283,6 +286,63 @@
             font-size: 0.9em;
             color: #78909C;
             margin-top: 10px;
+        }
+
+        /* Адаптивность для телефонов */
+        @media (max-width: 768px) {
+            .chat-room, .username-container {
+                flex-direction: column;
+                width: 95%;
+                padding: 15px;
+                max-width: none;
+            }
+            .users-panel {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 15px;
+            }
+            #messages {
+                height: 60vh; /* Уменьшаем высоту на маленьких экранах */
+            }
+            #message-input {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            .input-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #emoji-button, button {
+                width: 100%;
+                margin: 5px 0;
+            }
+            select {
+                width: 100%;
+            }
+            .message, .announcement {
+                max-width: 90%;
+            }
+            .delete-btn {
+                right: 5px;
+                top: 5px;
+            }
+            .reply-btn {
+                right: 60px;
+                top: 5px;
+            }
+            .username-container h2 {
+                font-size: 1.5em;
+            }
+            #username-input, #password-input {
+                width: 100%;
+            }
+            #password-container {
+                width: 90%;
+                left: 50%;
+                transform: translateX(-50%);
+                top: 50%;
+                padding: 15px;
+            }
         }
     </style>
 </head>
