@@ -793,9 +793,6 @@
         }
 
         function getUserRoleIcon(username) {
-            const groups = userGroups.get(username.toLowerCase()) || [];
-            if (groups.includes("Администратор")) return "👑";
-            if (groups.includes("Модератор")) return "🛡️";
             return "";
         }
 
@@ -876,7 +873,6 @@
             usersList.innerHTML = "";
             const onlineUsers = users.slice(0, onlineCount);
             users.forEach(user => {
-                socket.emit("get profile", user)
                 const li = document.createElement("li");
                 const roleIcon = getUserRoleIcon(user);
                 li.textContent = `${roleIcon} ${user}`;
