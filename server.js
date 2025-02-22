@@ -2,10 +2,34 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
+const sqlite3 = require("sqlite3").verbose();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// Подключаем базу данных SQLite
+const db = new sqlite3.Database("./chat.db", (err) => {
+    if (err) {
+        console.error("Ошибка подключения к базе данных:", err.message);
+    } else {
+        console.log("Подключено к базе данных SQLite");
+    }
+});
+
+// Создаём таблицу сообщений, если её нет
+db.run(`
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room TEXT NOT NULL,
+        username TEXT NOT NULL,
+        msg TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        messageId TEXT NOT NULL,
+        replyTo TEXT,
+        type TEXT NOT NULL
+    )
+`);
 
 app.get("/", (req, res) => {
     res.sendFile(__dirname + "/index.html");
@@ -16,7 +40,6 @@ app.use("/emoji-picker", express.static(path.join(__dirname, "node_modules/emoji
 const rooms = ["room1", "room2"];
 const users = new Map();
 const mutedUsers = new Map();
-const chatHistory = new Map(); // Храним историю для каждой комнаты
 const blacklistedNicknames = [
     "administrator", "админ", "moderator", "модератор", "root", "superuser"
 ].map(name => name.toLowerCase());
@@ -28,6 +51,34 @@ function updateRoomUsers(room) {
         .filter(s => s.rooms.has(room))
         .map(s => users.get(s.id));
     io.to(room).emit("update users", roomUsers);
+}
+
+function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }) {
+    db.run(
+        `INSERT INTO messages (room, username, msg, timestamp, messageId, replyTo, type) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [room, username, msg, timestamp, messageId, replyTo || null, type],
+        (err) => {
+            if (err) console.error("Ошибка сохранения сообщения:", err.message);
+        }
+    );
+}
+
+function getChatHistory(room, callback) {
+    db.all(`SELECT * FROM messages WHERE room = ?`, [room], (err, rows) => {
+        if (err) {
+            console.error("Ошибка загрузки истории:", err.message);
+            callback([]);
+        } else {
+            callback(rows.map(row => ({
+                username: row.username,
+                msg: row.msg,
+                timestamp: row.timestamp,
+                messageId: row.messageId,
+                replyTo: row.replyTo,
+                type: row.type
+            })));
+        }
+    });
 }
 
 io.on("connection", (socket) => {
@@ -76,10 +127,10 @@ io.on("connection", (socket) => {
             console.log(`${users.get(socket.id)} присоединился к ${room}`);
             updateRoomUsers(room);
 
-            // Отправляем историю чата новому пользователю
-            if (chatHistory.has(room)) {
-                socket.emit("chat history", chatHistory.get(room));
-            }
+            // Отправляем историю чата из базы данных
+            getChatHistory(room, (history) => {
+                socket.emit("chat history", history);
+            });
         }
     });
 
@@ -93,22 +144,21 @@ io.on("connection", (socket) => {
 
         const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-        const messageData = { username, msg, timestamp, messageId, replyTo };
+        const messageData = { room, username, msg, timestamp, messageId, replyTo, type: "message" };
 
         if (username.toLowerCase() === "admin" && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
             if (announcement) {
                 messageData.msg = announcement;
+                messageData.type = "announcement";
                 io.to(room).emit("announcement", messageData);
-                if (!chatHistory.has(room)) chatHistory.set(room, []);
-                chatHistory.get(room).push({ ...messageData, type: "announcement" });
+                saveMessage(messageData);
             }
             return;
         }
 
         io.to(room).emit("chat message", messageData);
-        if (!chatHistory.has(room)) chatHistory.set(room, []);
-        chatHistory.get(room).push({ ...messageData, type: "message" });
+        saveMessage(messageData);
     });
 
     socket.on("typing", (room) => {
@@ -123,18 +173,18 @@ io.on("connection", (socket) => {
     socket.on("delete message", ({ room, messageId }) => {
         if (users.get(socket.id)?.toLowerCase() === "admin") {
             io.to(room).emit("message deleted", messageId);
-            if (chatHistory.has(room)) {
-                const history = chatHistory.get(room);
-                const index = history.findIndex(msg => msg.messageId === messageId);
-                if (index !== -1) history.splice(index, 1);
-            }
+            db.run(`DELETE FROM messages WHERE messageId = ?`, [messageId], (err) => {
+                if (err) console.error("Ошибка удаления сообщения:", err.message);
+            });
         }
     });
 
     socket.on("clear chat", (room) => {
         if (users.get(socket.id)?.toLowerCase() === "admin") {
             io.to(room).emit("chat cleared");
-            if (chatHistory.has(room)) chatHistory.set(room, []);
+            db.run(`DELETE FROM messages WHERE room = ?`, [room], (err) => {
+                if (err) console.error("Ошибка очистки чата:", err.message);
+            });
         }
     });
 
@@ -167,6 +217,15 @@ io.on("connection", (socket) => {
         mutedUsers.delete(socket.id);
         console.log(`${username} отключился`);
         currentRooms.forEach(room => updateRoomUsers(room));
+    });
+});
+
+// Закрываем базу данных при завершении работы сервера
+process.on("SIGINT", () => {
+    db.close((err) => {
+        if (err) console.error("Ошибка закрытия базы данных:", err.message);
+        console.log("База данных закрыта");
+        process.exit(0);
     });
 });
 
