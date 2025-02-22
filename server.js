@@ -11,7 +11,7 @@ const io = new Server(server);
 
 // Подключаемся к PostgreSQL (замени URL на свой из Render)
 const pool = new Pool({
-    connectionString: "postgres://chat_user:your_password@your_host:5432/chat", // Вставь Internal Database URL из Render
+    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7", // Вставь Internal Database URL из Render
     ssl: { rejectUnauthorized: false }
 });
 
