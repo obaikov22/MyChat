@@ -113,7 +113,7 @@ const JWT_SECRET = "MySecretPassword123";
 const MAIN_ADMIN_NICKNAME = "Admin"; // Замени на свой ник
 
 function generateToken(nickname) {
-    return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "10m" });
+    return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "1d" });
 }
 
 async function verifyToken(token) {
@@ -296,76 +296,6 @@ io.on("connection", (socket) => {
             }
         } catch (error) {
             console.error("Ошибка авторизации:", error.message);
-            socket.emit("auth error", "Ошибка сервера");
-        }
-    });
-
-    socket.on("register", async ({ nickname, password }) => {
-        const trimmedNickname = nickname.trim();
-        const lowerNickname = trimmedNickname.toLowerCase();
-        if (!trimmedNickname || !password) {
-            socket.emit("auth error", "Ник и пароль обязательны");
-            return;
-        }
-        if (blacklistedNicknames.includes(lowerNickname) && lowerNickname !== "admin") {
-            socket.emit("auth error", "Этот никнейм запрещён");
-            return;
-        }
-        try {
-            const res = await pool.query(`SELECT * FROM users WHERE nickname = $1`, [trimmedNickname]);
-            if (res.rows.length > 0) {
-                socket.emit("auth error", "Этот никнейм уже зарегистрирован, используйте вход");
-            } else {
-                const hashedPassword = await bcrypt.hash(password, 10);
-                const isMainAdmin = trimmedNickname === MAIN_ADMIN_NICKNAME;
-                await pool.query(
-                    `INSERT INTO users (nickname, password, last_seen, is_main_admin) VALUES ($1, $2, CURRENT_TIMESTAMP, $3)`,
-                    [trimmedNickname, hashedPassword, isMainAdmin]
-                );
-                users.set(socket.id, trimmedNickname);
-                const token = generateToken(trimmedNickname);
-                const permissions = await getUserPermissions(trimmedNickname);
-                socket.emit("auth success", { nickname: trimmedNickname, token, permissions });
-                console.log(`Пользователь ${trimmedNickname} успешно зарегистрирован`);
-                updateUserList();
-            }
-        } catch (err) {
-            console.error("Ошибка регистрации:", err.message);
-            socket.emit("auth error", "Ошибка сервера");
-        }
-    });
-
-    socket.on("login", async ({ nickname, password }) => {
-        const trimmedNickname = nickname.trim();
-        const lowerNickname = trimmedNickname.toLowerCase();
-        if (!trimmedNickname || !password) {
-            socket.emit("auth error", "Ник и пароль обязательны");
-            return;
-        }
-        try {
-            const res = await pool.query(`SELECT * FROM users WHERE nickname = $1`, [trimmedNickname]);
-            if (res.rows.length === 0) {
-                socket.emit("auth error", "Этот никнейм не зарегистрирован");
-            } else {
-                const match = await bcrypt.compare(password, res.rows[0].password);
-                if (match) {
-                    if (Array.from(users.values()).includes(trimmedNickname)) {
-                        socket.emit("auth error", "Этот никнейм уже используется");
-                    } else {
-                        users.set(socket.id, trimmedNickname);
-                        await pool.query(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE nickname = $1`, [trimmedNickname]);
-                        const token = generateToken(trimmedNickname);
-                        const permissions = await getUserPermissions(trimmedNickname);
-                        socket.emit("auth success", { nickname: trimmedNickname, token, permissions });
-                        console.log(`${trimmedNickname} вошёл`);
-                        updateUserList();
-                    }
-                } else {
-                    socket.emit("auth error", "Неверный пароль");
-                }
-            }
-        } catch (err) {
-            console.error("Ошибка входа:", err.message);
             socket.emit("auth error", "Ошибка сервера");
         }
     });
