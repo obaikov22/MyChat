@@ -16,6 +16,7 @@ app.use("/emoji-picker", express.static(path.join(__dirname, "node_modules/emoji
 const rooms = ["room1", "room2"];
 const users = new Map();
 const mutedUsers = new Map();
+const chatHistory = new Map(); // Храним историю для каждой комнаты
 const blacklistedNicknames = [
     "administrator", "админ", "moderator", "модератор", "root", "superuser"
 ].map(name => name.toLowerCase());
@@ -74,6 +75,11 @@ io.on("connection", (socket) => {
             socket.join(room);
             console.log(`${users.get(socket.id)} присоединился к ${room}`);
             updateRoomUsers(room);
+
+            // Отправляем историю чата новому пользователю
+            if (chatHistory.has(room)) {
+                socket.emit("chat history", chatHistory.get(room));
+            }
         }
     });
 
@@ -87,16 +93,22 @@ io.on("connection", (socket) => {
 
         const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+        const messageData = { username, msg, timestamp, messageId, replyTo };
 
         if (username.toLowerCase() === "admin" && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
             if (announcement) {
-                io.to(room).emit("announcement", { username, msg: announcement, timestamp, messageId, replyTo });
+                messageData.msg = announcement;
+                io.to(room).emit("announcement", messageData);
+                if (!chatHistory.has(room)) chatHistory.set(room, []);
+                chatHistory.get(room).push({ ...messageData, type: "announcement" });
             }
             return;
         }
 
-        io.to(room).emit("chat message", { username, msg, timestamp, messageId, replyTo });
+        io.to(room).emit("chat message", messageData);
+        if (!chatHistory.has(room)) chatHistory.set(room, []);
+        chatHistory.get(room).push({ ...messageData, type: "message" });
     });
 
     socket.on("typing", (room) => {
@@ -111,12 +123,18 @@ io.on("connection", (socket) => {
     socket.on("delete message", ({ room, messageId }) => {
         if (users.get(socket.id)?.toLowerCase() === "admin") {
             io.to(room).emit("message deleted", messageId);
+            if (chatHistory.has(room)) {
+                const history = chatHistory.get(room);
+                const index = history.findIndex(msg => msg.messageId === messageId);
+                if (index !== -1) history.splice(index, 1);
+            }
         }
     });
 
     socket.on("clear chat", (room) => {
         if (users.get(socket.id)?.toLowerCase() === "admin") {
             io.to(room).emit("chat cleared");
+            if (chatHistory.has(room)) chatHistory.set(room, []);
         }
     });
 
