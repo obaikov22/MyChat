@@ -701,6 +701,7 @@
         let replyingTo = null;
         let userPermissions = {};
         const userGroups = new Map();
+        const IMGBB_API_KEY = "твой_api_ключ_от_imgbb"; // Вставь свой ключ
     
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
@@ -776,7 +777,31 @@
             document.getElementById("messages").innerHTML = "";
         }
     
-        function sendMessage() {
+        async function uploadToImgBB(file) {
+            const formData = new FormData();
+            formData.append("image", file);
+            formData.append("key", IMGBB_API_KEY);
+    
+            try {
+                const response = await fetch("https://api.imgbb.com/1/upload", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.success) {
+                    console.log("Файл загружен на ImgBB:", data.data.url);
+                    return data.data.url;
+                } else {
+                    throw new Error(data.error.message);
+                }
+            } catch (error) {
+                console.error("Ошибка загрузки на ImgBB:", error);
+                alert("Ошибка загрузки изображения");
+                return null;
+            }
+        }
+    
+        async function sendMessage() {
             const msg = messageInput.value.trim();
             const file = fileInput.files[0];
             if (!msg && !file) return;
@@ -789,27 +814,20 @@
                     fileInput.value = "";
                     return;
                 }
-                const reader = new FileReader();
-                reader.onload = () => {
-                    console.log("Файл прочитан, отправляю на сервер");
+                const mediaUrl = await uploadToImgBB(file);
+                if (mediaUrl) {
                     socket.emit("chat message", { 
                         room: currentRoom, 
                         msg, 
                         replyTo: replyingTo, 
-                        media: reader.result 
+                        media: mediaUrl 
                     });
                     messageInput.value = "";
                     fileInput.value = "";
                     replyingTo = null;
                     messageInput.placeholder = "Напиши сообщение...";
                     cancelReplyBtn.classList.add("hidden");
-                };
-                reader.onerror = () => {
-                    console.error("Ошибка чтения файла");
-                    alert("Ошибка чтения файла");
-                    fileInput.value = "";
-                };
-                reader.readAsDataURL(file);
+                }
             } else {
                 socket.emit("chat message", { 
                     room: currentRoom, 
@@ -896,11 +914,11 @@
             ` : "";
             let mediaContent = "";
             if (media) {
-                if (media.startsWith("data:image/")) {
+                if (media.startsWith("data:image/") || media.startsWith("http")) {
                     mediaContent = `<div class="media-container"><img src="${media}" alt="Attached image" onclick="showImageModal('${media}')"></div>`;
-                } else if (media.startsWith("data:video/")) {
+                } else if (media.startsWith("data:video/") || media.startsWith("http") && media.endsWith(".mp4")) {
                     mediaContent = `<div class="media-container"><video controls src="${media}"></video></div>`;
-                } else if (media.startsWith("data:audio/")) {
+                } else if (media.startsWith("data:audio/") || media.startsWith("http") && media.endsWith(".mp3")) {
                     mediaContent = `<div class="media-container"><audio controls src="${media}"></audio></div>`;
                 }
             }
@@ -1058,7 +1076,7 @@
             }
         });
     
-        messageInput.addEventListener("paste", (event) => {
+        messageInput.addEventListener("paste", async (event) => {
             const items = (event.clipboardData || event.originalEvent.clipboardData).items;
             for (const item of items) {
                 if (item.type.indexOf("image") === 0) {
@@ -1069,25 +1087,20 @@
                         alert("Изображение слишком большое (макс. 10 МБ)");
                         return;
                     }
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        console.log("Изображение из буфера прочитано, отправляю");
+                    const mediaUrl = await uploadToImgBB(blob);
+                    if (mediaUrl) {
+                        console.log("Изображение из буфера загружено, отправляю URL");
                         socket.emit("chat message", { 
                             room: currentRoom, 
                             msg: messageInput.value.trim(), 
                             replyTo: replyingTo, 
-                            media: reader.result 
+                            media: mediaUrl 
                         });
                         messageInput.value = "";
                         replyingTo = null;
                         messageInput.placeholder = "Напиши сообщение...";
                         cancelReplyBtn.classList.add("hidden");
-                    };
-                    reader.onerror = () => {
-                        console.error("Ошибка чтения изображения из буфера");
-                        alert("Ошибка чтения изображения");
-                    };
-                    reader.readAsDataURL(blob);
+                    }
                     event.preventDefault();
                     break;
                 }
