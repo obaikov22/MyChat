@@ -45,6 +45,7 @@ const blacklistedNicknames = [
 ].map(name => name.toLowerCase());
 
 const adminPassword = "MySecretPassword123"; // Замени на свой пароль
+const MAX_MESSAGES = 100; // Ограничение на 100 сообщений
 
 function updateRoomUsers(room) {
     const roomUsers = Array.from(io.sockets.sockets.values())
@@ -53,32 +54,58 @@ function updateRoomUsers(room) {
     io.to(room).emit("update users", roomUsers);
 }
 
-function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }) {
+function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type }, callback) {
     db.run(
         `INSERT INTO messages (room, username, msg, timestamp, messageId, replyTo, type) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [room, username, msg, timestamp, messageId, replyTo || null, type],
         (err) => {
-            if (err) console.error("Ошибка сохранения сообщения:", err.message);
+            if (err) {
+                console.error("Ошибка сохранения сообщения:", err.message);
+                callback(err);
+            } else {
+                // Удаляем старые сообщения, если их больше 100
+                db.run(`
+                    DELETE FROM messages 
+                    WHERE room = ? AND id NOT IN (
+                        SELECT id FROM messages 
+                        WHERE room = ? 
+                        ORDER BY id DESC 
+                        LIMIT ${MAX_MESSAGES}
+                    )`,
+                    [room, room],
+                    (err) => {
+                        if (err) console.error("Ошибка удаления старых сообщений:", err.message);
+                        callback(null);
+                    }
+                );
+            }
         }
     );
 }
 
 function getChatHistory(room, callback) {
-    db.all(`SELECT * FROM messages WHERE room = ?`, [room], (err, rows) => {
-        if (err) {
-            console.error("Ошибка загрузки истории:", err.message);
-            callback([]);
-        } else {
-            callback(rows.map(row => ({
-                username: row.username,
-                msg: row.msg,
-                timestamp: row.timestamp,
-                messageId: row.messageId,
-                replyTo: row.replyTo,
-                type: row.type
-            })));
+    db.all(`
+        SELECT * FROM messages 
+        WHERE room = ? 
+        ORDER BY id DESC 
+        LIMIT ${MAX_MESSAGES}`,
+        [room],
+        (err, rows) => {
+            if (err) {
+                console.error("Ошибка загрузки истории:", err.message);
+                callback([]);
+            } else {
+                callback(rows.map(row => ({
+                    username: row.username,
+                    msg: row.msg,
+                    timestamp: row.timestamp,
+                    messageId: row.messageId,
+                    replyTo: row.replyTo,
+                    type: row.type
+                })));
+            }
         }
-    });
+    );
 }
 
 io.on("connection", (socket) => {
@@ -127,7 +154,6 @@ io.on("connection", (socket) => {
             console.log(`${users.get(socket.id)} присоединился к ${room}`);
             updateRoomUsers(room);
 
-            // Отправляем историю чата из базы данных
             getChatHistory(room, (history) => {
                 socket.emit("chat history", history);
             });
@@ -152,13 +178,17 @@ io.on("connection", (socket) => {
                 messageData.msg = announcement;
                 messageData.type = "announcement";
                 io.to(room).emit("announcement", messageData);
-                saveMessage(messageData);
+                saveMessage(messageData, (err) => {
+                    if (!err) console.log("Объявление сохранено");
+                });
             }
             return;
         }
 
         io.to(room).emit("chat message", messageData);
-        saveMessage(messageData);
+        saveMessage(messageData, (err) => {
+            if (!err) console.log("Сообщение сохранено");
+        });
     });
 
     socket.on("typing", (room) => {
@@ -220,7 +250,6 @@ io.on("connection", (socket) => {
     });
 });
 
-// Закрываем базу данных при завершении работы сервера
 process.on("SIGINT", () => {
     db.close((err) => {
         if (err) console.error("Ошибка закрытия базы данных:", err.message);
