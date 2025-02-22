@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Мой чат</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #E8DAEF, #F5F5F5);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .chat-room, .username-container {
+            width: 90%;
+            max-width: 1100px;
+            background: #FFFFFF;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(155, 89, 182, 0.2);
+            display: flex;
+            flex-direction: row;
+            transition: all 0.3s ease;
+        }
+        .chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #messages {
+            height: 500px;
+            overflow-y: auto;
+            background: #F9F9F9;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: #9B59B6 #F9F9F9;
+        }
+        #messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        #messages::-webkit-scrollbar-thumb {
+            background: #9B59B6;
+            border-radius: 4px;
+        }
+        #message-input {
+            width: 70%;
+            padding: 12px 15px;
+            border: 1px solid #E0E0E0;
+            border-radius: 25px;
+            background: #FFFFFF;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        #message-input:focus {
+            border-color: #9B59B6;
+            box-shadow: 0 0 5px rgba(155, 89, 182, 0.3);
+        }
+        #username-input, #password-input {
+            width: 60%;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 25px;
+            background: #F2E7FE;
+            margin: 10px 0;
+            outline: none;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        button {
+            padding: 12px 20px;
+            background: #9B59B6;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+        button:hover {
+            background: #7E57C2;
+            transform: translateY(-2px);
+        }
+        select {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 25px;
+            background: #F2E7FE;
+            margin-bottom: 20px;
+            width: 150px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%239B59B6" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 12px 15px;
+            background: #E8DAEF;
+            border-radius: 15px;
+            position: relative;
+            max-width: 70%;
+            word-wrap: break-word;
+            transition: all 0.2s ease;
+        }
+        .message:hover {
+            background: #D1C4E9;
+        }
+        .message:hover .delete-btn, .message:hover .reply-btn {
+            display: inline;
+        }
+        .announcement {
+            margin: 15px 0;
+            padding: 15px;
+            background: #9B59B6;
+            color: #FFFFFF;
+            border-radius: 15px;
+            border: 2px solid #7E57C2;
+            box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4);
+            max-width: 85%;
+            font-weight: 500;
+            position: relative;
+        }
+        .announcement .username {
+            color: #FFFFFF;
+        }
+        .announcement .timestamp {
+            color: #E0E0E0;
+        }
+        .announcement:hover {
+            background: #8E24AA;
+        }
+        .username {
+            font-weight: 600;
+            color: #9B59B6;
+        }
+        .username.admin {
+            color: #D32F2F;
+        }
+        .timestamp {
+            font-size: 0.85em;
+            color: #78909C;
+            margin-left: 10px;
+        }
+        .reply-info {
+            font-size: 0.9em;
+            color: #26A69A;
+            margin-bottom: 8px;
+            padding: 8px 10px;
+            background: rgba(38, 166, 154, 0.1);
+            border-radius: 10px;
+            cursor: pointer;
+            border-left: 3px solid #26A69A;
+        }
+        .reply-info:hover {
+            background: rgba(38, 166, 154, 0.2);
+        }
+        .reply-text {
+            font-style: italic;
+            color: #555;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #emoji-button {
+            margin-left: 10px;
+            background: #26A69A;
+            padding: 12px;
+            font-size: 18px;
+        }
+        #emoji-button:hover {
+            background: #00897B;
+        }
+        emoji-picker {
+            position: absolute;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        .input-container {
+            display: flex;
+            align-items: center;
+        }
+        .hidden {
+            display: none;
+        }
+        #username-error, #password-error {
+            color: #EF5350;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        #password-container {
+            position: absolute;
+            background: #FFFFFF;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(155, 89, 182, 0.2);
+            z-index: 1000;
+            display: none;
+        }
+        .users-panel {
+            width: 250px;
+            margin-left: 20px;
+            background: #F2E7FE;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(155, 89, 182, 0.1);
+        }
+        .users-panel h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            color: #9B59B6;
+            font-weight: 600;
+        }
+        .users-panel ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .users-panel li {
+            padding: 8px 0;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.95em;
+        }
+        .admin-controls {
+            margin-top: 15px;
+        }
+        .admin-btn {
+            padding: 8px 15px;
+            font-size: 0.9em;
+            margin: 5px 0;
+            background: #26A69A;
+            display: block;
+            width: 100%;
+        }
+        .admin-btn:hover {
+            background: #00897B;
+        }
+        .delete-btn, .reply-btn {
+            display: none;
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            padding: 5px 10px;
+            background: #EF5350;
+            font-size: 0.85em;
+            border-radius: 20px;
+        }
+        .reply-btn {
+            background: #26A69A;
+            right: 70px;
+        }
+        .reply-btn:hover {
+            background: #00897B;
+        }
+        .admin-icon {
+            background: none;
+            padding: 5px;
+            margin-left: 5px;
+            font-size: 16px;
+            color: #26A69A;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s ease;
+        }
+        .admin-icon:hover {
+            background: rgba(38, 166, 154, 0.2);
+            color: #00897B;
+        }
+        #typing-status {
+            font-size: 0.9em;
+            color: #78909C;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="username-container">
+        <h2>Введи свой ник</h2>
+        <input id="username-input" type="text" placeholder="Твой ник">
+        <button onclick="setUsername()">Войти в чат</button>
+        <div id="username-error"></div>
+        <div id="password-container" class="hidden">
+            <h3>Введи пароль для Admin</h3>
+            <input id="password-input" type="password" placeholder="Пароль">
+            <button onclick="submitAdminPassword()">Подтвердить</button>
+            <div id="password-error"></div>
+        </div>
+    </div>
+    <div class="chat-room hidden">
+        <div class="chat-container">
+            <select id="room-select" onchange="joinRoom()">
+                <option value="room1">Комната 1</option>
+                <option value="room2">Комната 2</option>
+            </select>
+            <div id="messages"></div>
+            <div class="input-container">
+                <input id="message-input" type="text" placeholder="Напиши сообщение...">
+                <button id="emoji-button">😊</button>
+                <button onclick="sendMessage()">Отправить</button>
+            </div>
+            <div id="typing-status"></div>
+            <emoji-picker id="emoji-picker"></emoji-picker>
+        </div>
+        <div class="users-panel">
+            <h3>Пользователи</h3>
+            <ul id="users-list"></ul>
+            <div class="admin-controls hidden" id="admin-controls">
+                <button class="admin-btn" onclick="clearChat()">Очистить чат</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/emoji-picker/index.js" type="module"></script>
+    <script>
+        const socket = io();
+        let currentRoom = "room1";
+        let username = "";
+        let replyingTo = null;
+
+        const messageInput = document.getElementById("message-input");
+        const emojiButton = document.getElementById("emoji-button");
+        const emojiPicker = document.getElementById("emoji-picker");
+        const usernameInput = document.getElementById("username-input");
+        const chatRoom = document.querySelector(".chat-room");
+        const usernameContainer = document.querySelector(".username-container");
+        const usernameError = document.getElementById("username-error");
+        const usersList = document.getElementById("users-list");
+        const passwordContainer = document.getElementById("password-container");
+        const passwordInput = document.getElementById("password-input");
+        const passwordError = document.getElementById("password-error");
+        const adminControls = document.getElementById("admin-controls");
+
+        function setUsername() {
+            username = usernameInput.value.trim();
+            if (username) {
+                if (username.toLowerCase() === "admin") {
+                    passwordContainer.style.display = "block";
+                    passwordContainer.style.top = `${usernameInput.offsetTop + 50}px`;
+                    passwordContainer.style.left = `${usernameInput.offsetLeft}px`;
+                    passwordInput.focus();
+                } else {
+                    socket.emit("set username", { username });
+                }
+            } else {
+                usernameError.innerText = "Никнейм не может быть пустым";
+            }
+        }
+
+        function submitAdminPassword() {
+            const password = passwordInput.value;
+            socket.emit("set username", { username, password });
+            passwordInput.value = "";
+        }
+
+        socket.on("username set", (setUsername) => {
+            username = setUsername;
+            usernameContainer.classList.add("hidden");
+            chatRoom.classList.remove("hidden");
+            if (username.toLowerCase() === "admin") {
+                adminControls.classList.remove("hidden");
+            }
+            joinRoom();
+        });
+
+        socket.on("username error", (message) => {
+            usernameError.innerText = message;
+        });
+
+        socket.on("admin password required", () => {
+            passwordError.innerText = "Неверный пароль для Admin";
+        });
+
+        socket.on("muted", (message) => {
+            alert(message);
+        });
+
+        function joinRoom() {
+            currentRoom = document.getElementById("room-select").value;
+            socket.emit("join room", currentRoom);
+            document.getElementById("messages").innerHTML = "";
+        }
+
+        function sendMessage() {
+            if (messageInput.value) {
+                socket.emit("chat message", { room: currentRoom, msg: messageInput.value, replyTo: replyingTo });
+                messageInput.value = "";
+                replyingTo = null;
+                messageInput.placeholder = "Напиши сообщение...";
+            }
+        }
+
+        function replyToMessage(messageId) {
+            replyingTo = messageId;
+            const repliedMessage = document.querySelector(`[data-message-id="${messageId}"] p`).textContent;
+            messageInput.placeholder = `Ответ на: "${repliedMessage.slice(0, 20)}..."`;
+            messageInput.focus();
+        }
+
+        function scrollToMessage(messageId) {
+            const message = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (message) {
+                message.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+
+        function deleteMessage(messageId) {
+            socket.emit("delete message", { room: currentRoom, messageId });
+        }
+
+        function clearChat() {
+            if (confirm("Очистить чат?")) {
+                socket.emit("clear chat", currentRoom);
+            }
+        }
+
+        function muteUser(targetUsername) {
+            const duration = prompt(`На сколько секунд замутить ${targetUsername}? (например, 60)`);
+            if (duration && !isNaN(duration)) {
+                socket.emit("mute user", { room: currentRoom, targetUsername, duration: parseInt(duration) });
+            }
+        }
+
+        function banUser(targetUsername) {
+            if (confirm(`Забанить ${targetUsername}?`)) {
+                socket.emit("ban user", { room: currentRoom, targetUsername });
+            }
+        }
+
+        socket.on("chat message", ({ username: msgUsername, msg, timestamp, messageId, replyTo }) => {
+            let messages = document.getElementById("messages");
+            const isAdmin = msgUsername.toLowerCase() === "admin";
+            const isMeAdmin = username.toLowerCase() === "admin";
+            const replyContent = replyTo ? `
+                <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
+                    ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
+                    <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
+                </div>
+            ` : "";
+            messages.innerHTML += `
+                <div class="message" data-message-id="${messageId}">
+                    ${replyContent}
+                    <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            `;
+            messages.scrollTop = messages.scrollHeight;
+        });
+
+        socket.on("announcement", ({ username, msg, timestamp, messageId, replyTo }) => {
+            let messages = document.getElementById("messages");
+            const isMeAdmin = username.toLowerCase() === "admin";
+            const replyContent = replyTo ? `
+                <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
+                    ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
+                    <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
+                </div>
+            ` : "";
+            messages.innerHTML += `
+                <div class="announcement" data-message-id="${messageId}">
+                    ${replyContent}
+                    <span class="username">${username} [Объявление]</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            `;
+            messages.scrollTop = messages.scrollHeight;
+        });
+
+        socket.on("message deleted", (messageId) => {
+            const message = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (message) message.remove();
+        });
+
+        socket.on("chat cleared", () => {
+            document.getElementById("messages").innerHTML = "";
+        });
+
+        socket.on("user muted", ({ username, duration }) => {
+            alert(`${username} замучен на ${duration} секунд`);
+        });
+
+        socket.on("user banned", (username) => {
+            alert(`${username} забанен`);
+        });
+
+        let typingTimeout;
+        messageInput.addEventListener("input", () => {
+            socket.emit("typing", currentRoom);
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit("stop typing", currentRoom);
+            }, 1000);
+        });
+
+        socket.on("typing", (username) => {
+            document.getElementById("typing-status").innerText = `${username} пишет...`;
+        });
+
+        socket.on("stop typing", () => {
+            document.getElementById("typing-status").innerText = "";
+        });
+
+        socket.on("update users", (roomUsers) => {
+            usersList.innerHTML = "";
+            roomUsers.forEach(user => {
+                const li = document.createElement("li");
+                li.textContent = user;
+                if (user.toLowerCase() === "admin") {
+                    li.style.color = "#D32F2F";
+                } else if (username.toLowerCase() === "admin") {
+                    const muteIcon = document.createElement("button");
+                    muteIcon.innerHTML = "🔇";
+                    muteIcon.className = "admin-icon";
+                    muteIcon.title = "Мут";
+                    muteIcon.onclick = () => muteUser(user);
+                    const banIcon = document.createElement("button");
+                    banIcon.innerHTML = "🚫";
+                    banIcon.className = "admin-icon";
+                    banIcon.title = "Бан";
+                    banIcon.onclick = () => banUser(user);
+                    li.appendChild(muteIcon);
+                    li.appendChild(banIcon);
+                }
+                usersList.appendChild(li);
+            });
+        });
+
+        messageInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
+
+        emojiButton.addEventListener("click", () => {
+            const isVisible = emojiPicker.style.display === "block";
+            emojiPicker.style.display = isVisible ? "none" : "block";
+            if (!isVisible) {
+                emojiPicker.style.top = `${messageInput.offsetTop - 300}px`;
+                emojiPicker.style.left = `${messageInput.offsetLeft}px`;
+            }
+        });
+
+        emojiPicker.addEventListener("emoji-click", (event) => {
+            messageInput.value += event.detail.unicode;
+            emojiPicker.style.display = "none";
+            messageInput.focus();
+        });
+    </script>
+</body>
+</html>
