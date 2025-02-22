@@ -850,7 +850,6 @@
             document.getElementById("profile-avatar").src = avatar;
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
             const statusEl = document.getElementById("profile-status");
-            const onlineUsers = usersList.querySelectorAll("li:not(.offline)").length;
             const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));
             statusEl.className = "status " + (isOnline ? "online" : "offline");
             statusEl.textContent = isOnline ? "Онлайн" : `Последний раз: ${new Date(last_seen).toLocaleString()}`;
@@ -864,7 +863,7 @@
             });
             document.getElementById("profile-bio").textContent = bio || "Нет подписи";
             const editBtn = document.getElementById("edit-profile-btn");
-            editBtn.classList.toggle("hidden", !isOwnProfile);
+            editBtn.style.display = isOwnProfile ? "block" : "none"; // Показываем только владельцу
             profileModal.style.display = "flex";
         });
 
@@ -898,7 +897,7 @@
 
         socket.on("profile updated", (message) => {
             console.log(message);
-            showProfile(username); // Обновляем профиль после сохранения
+            showProfile(username);
         });
 
         function cancelEdit() {

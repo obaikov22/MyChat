@@ -82,7 +82,7 @@ const blacklistedNicknames = [
 
 const adminPassword = "MySecretPassword123";
 const MAX_MESSAGES = 100;
-const JWT_SECRET = "myChatAppSecret123"; // Замени на свой уникальный ключ
+const JWT_SECRET = "MySecretPassword123"; // Замени на свой уникальный ключ
 
 function generateToken(nickname) {
     return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "10m" });
