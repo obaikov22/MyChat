@@ -473,13 +473,13 @@
         }
 
         function sendMessage() {
-            if (messageInput.value) {
-                socket.emit("chat message", { room: currentRoom, msg: messageInput.value, replyTo: replyingTo });
-                messageInput.value = "";
-                replyingTo = null;
-                messageInput.placeholder = "Напиши сообщение...";
-            }
-        }
+    if (messageInput.value) {
+        socket.emit("chat message", { room: currentRoom, msg: messageInput.value, replyTo: replyingTo });
+        messageInput.value = "";
+        replyingTo = null;
+        messageInput.placeholder = "Напиши сообщение...";
+    }
+}
 
         function replyToMessage(messageId) {
             replyingTo = messageId;
@@ -567,17 +567,20 @@ socket.on("chat message", ({ username: msgUsername, msg, timestamp, messageId, r
             <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
         </div>
     ` : "";
-    messages.innerHTML += `
-        <div class="message" data-message-id="${messageId}">
-            ${replyContent}
-            <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
-            <span class="timestamp">${timestamp}</span>
-            <p>${msg}</p>
-            ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-            <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-        </div>
-    `;
-    messages.scrollTop = messages.scrollHeight;
+    // Проверяем, не добавлено ли сообщение ранее
+    if (!document.querySelector(`[data-message-id="${messageId}"]`)) {
+        messages.innerHTML += `
+            <div class="message" data-message-id="${messageId}">
+                ${replyContent}
+                <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                <span class="timestamp">${timestamp}</span>
+                <p>${msg}</p>
+                ${isMeAdmin ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+            </div>
+        `;
+        messages.scrollTop = messages.scrollHeight;
+    }
 });
 
         socket.on("chat message", ({ username: msgUsername, msg, timestamp, messageId, replyTo }) => {
