@@ -419,7 +419,7 @@
         .close-btn:hover {
             color: #EF5350;
         }
-        .edit-form {
+        .edit-form, .group-form {
             display: none;
             margin-top: 20px;
             animation: fadeSlideIn 0.3s ease;
@@ -428,7 +428,7 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .edit-form input, .edit-form textarea {
+        .edit-form input, .edit-form textarea, .group-form select {
             width: 100%;
             padding: 10px;
             margin: 8px 0;
@@ -439,7 +439,7 @@
             background: #F9F9F9;
             transition: border-color 0.3s ease;
         }
-        .edit-form input:focus, .edit-form textarea:focus {
+        .edit-form input:focus, .edit-form textarea:focus, .group-form select:focus {
             border-color: #9B59B6;
             outline: none;
         }
@@ -447,16 +447,16 @@
             height: 80px;
             resize: none;
         }
-        .edit-form button {
+        .edit-form button, .group-form button {
             margin-top: 10px;
             width: 48%;
             font-size: 1em;
         }
-        .edit-form button:nth-child(2) {
+        .edit-form button:nth-child(2), .group-form button:nth-child(2) {
             background: #EF5350;
             margin-left: 4%;
         }
-        .edit-form button:nth-child(2):hover {
+        .edit-form button:nth-child(2):hover, .group-form button:nth-child(2):hover {
             background: #D81B60;
         }
 
@@ -573,11 +573,11 @@
             .profile-info .status, .profile-info .age {
                 font-size: 0.85em;
             }
-            .edit-form input, .edit-form textarea {
+            .edit-form input, .edit-form textarea, .group-form select {
                 font-size: 1em;
                 padding: 12px;
             }
-            .edit-form button {
+            .edit-form button, .group-form button {
                 padding: 12px;
                 font-size: 1em;
             }
@@ -638,6 +638,16 @@
                 <button onclick="saveProfile()">Сохранить</button>
                 <button onclick="cancelEdit()">Отмена</button>
             </div>
+            <div id="group-form" class="group-form">
+                <select id="group-select">
+                    <option value="">Выберите группу</option>
+                    <option value="Администратор">Администратор</option>
+                    <option value="Модератор">Модератор</option>
+                </select>
+                <button onclick="assignGroup()">Назначить</button>
+                <button onclick="cancelGroupForm()">Отмена</button>
+            </div>
+            <button id="assign-group-btn" class="admin-btn hidden" onclick="showGroupForm()">Назначить группу</button>
         </div>
     </div>
 
@@ -700,7 +710,7 @@
             localStorage.setItem("chatToken", token);
             authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
-            if (username.toLowerCase() === "admin") {
+            if (username.toLowerCase() === "admin") { // Пока оставим для обратной совместимости
                 adminControls.classList.remove("hidden");
             }
             joinRoom();
@@ -782,7 +792,7 @@
             messages.innerHTML = "";
             history.forEach(({ type, username, msg, timestamp, messageId, replyTo }) => {
                 const isAdmin = username.toLowerCase() === "admin";
-                const isMeAdmin = username.toLowerCase() === "admin";
+                const isMeAdmin = username.toLowerCase() === "admin"; // Пока для обратной совместимости
                 const replyContent = replyTo ? `
                     <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
                         ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
@@ -961,7 +971,7 @@
             socket.emit("get profile", targetUsername);
         }
 
-        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, isOwnProfile }) => {
+        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, groups, isOwnProfile, canAssignGroups }) => {
             document.getElementById("profile-nickname").textContent = nickname;
             document.getElementById("profile-avatar").src = avatar;
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
@@ -977,15 +987,26 @@
                 span.textContent = ach;
                 achievementsEl.appendChild(span);
             });
+            if (groups && groups.length > 0) {
+                groups.forEach(group => {
+                    const span = document.createElement("span");
+                    span.className = "achievement";
+                    span.textContent = group;
+                    achievementsEl.appendChild(span);
+                });
+            }
             document.getElementById("profile-bio").textContent = bio || "Нет подписи";
             const editBtn = document.getElementById("edit-profile-btn");
             editBtn.style.display = isOwnProfile ? "block" : "none";
+            const assignBtn = document.getElementById("assign-group-btn");
+            assignBtn.style.display = canAssignGroups ? "block" : "none";
             profileModal.style.display = "flex";
         });
 
         function closeProfileModal() {
             profileModal.style.display = "none";
             document.getElementById("edit-form").style.display = "none";
+            document.getElementById("group-form").style.display = "none";
         }
 
         function showEditForm() {
@@ -1018,6 +1039,27 @@
 
         function cancelEdit() {
             document.getElementById("edit-form").style.display = "none";
+        }
+
+        function showGroupForm() {
+            document.getElementById("group-form").style.display = "block";
+        }
+
+        function assignGroup() {
+            const groupName = document.getElementById("group-select").value;
+            if (groupName) {
+                socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, groupName });
+            }
+            closeProfileModal();
+        }
+
+        socket.on("group assigned", (message) => {
+            alert(message);
+            showProfile(document.getElementById("profile-nickname").textContent);
+        });
+
+        function cancelGroupForm() {
+            document.getElementById("group-form").style.display = "none";
         }
     </script>
 </body>

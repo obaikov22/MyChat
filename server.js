@@ -20,6 +20,7 @@ pool.connect((err) => {
     else console.log("Подключено к PostgreSQL");
 });
 
+// Обновляем таблицу users
 pool.query(`
     CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -28,13 +29,15 @@ pool.query(`
         avatar TEXT,
         age INTEGER,
         last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        bio TEXT
+        bio TEXT,
+        is_main_admin BOOLEAN DEFAULT FALSE
     )
 `, (err) => {
     if (err) console.error("Ошибка создания таблицы users:", err.message);
     else console.log("Таблица users готова");
 });
 
+// Таблица сообщений
 pool.query(`
     CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
@@ -51,6 +54,31 @@ pool.query(`
     else console.log("Таблица messages готова");
 });
 
+// Таблица групп
+pool.query(`
+    CREATE TABLE IF NOT EXISTS groups (
+        id SERIAL PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
+        permissions JSONB NOT NULL
+    )
+`, (err) => {
+    if (err) console.error("Ошибка создания таблицы groups:", err.message);
+    else console.log("Таблица groups готова");
+});
+
+// Таблица связи пользователей и групп
+pool.query(`
+    CREATE TABLE IF NOT EXISTS user_groups (
+        user_id INTEGER REFERENCES users(id),
+        group_id INTEGER REFERENCES groups(id),
+        PRIMARY KEY (user_id, group_id)
+    )
+`, (err) => {
+    if (err) console.error("Ошибка создания таблицы user_groups:", err.message);
+    else console.log("Таблица user_groups готова");
+});
+
+// Таблица достижений
 pool.query(`
     CREATE TABLE IF NOT EXISTS achievements (
         id SERIAL PRIMARY KEY,
@@ -62,6 +90,22 @@ pool.query(`
     else console.log("Таблица achievements готова");
 });
 
+// Инициализация групп (выполняется один раз)
+async function initializeGroups() {
+    const groups = [
+        { name: "Администратор", permissions: { deleteMessages: true, clearChat: true, muteUsers: true, banUsers: true, assignGroups: false } },
+        { name: "Модератор", permissions: { deleteMessages: false, clearChat: false, muteUsers: true, banUsers: true, assignGroups: false } }
+    ];
+    for (const group of groups) {
+        await pool.query(
+            `INSERT INTO groups (name, permissions) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
+            [group.name, JSON.stringify(group.permissions)]
+        );
+    }
+    console.log("Группы инициализированы");
+}
+initializeGroups();
+
 app.get("/", (req, res) => res.sendFile(__dirname + "/index.html"));
 app.use("/emoji-picker", express.static(path.join(__dirname, "node_modules/emoji-picker-element")));
 
@@ -70,9 +114,9 @@ const users = new Map();
 const mutedUsers = new Map();
 const blacklistedNicknames = ["administrator", "админ", "moderator", "модератор", "root", "superuser"].map(name => name.toLowerCase());
 
-const adminPassword = "MySecretPassword123";
 const MAX_MESSAGES = 100;
 const JWT_SECRET = "MySecretPassword123";
+const MAIN_ADMIN_NICKNAME = "Admin"; // Замени на свой ник
 
 function generateToken(nickname) {
     return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "10m" });
@@ -86,6 +130,26 @@ async function verifyToken(token) {
         console.error("Неверный или истёкший токен:", err.message);
         return null;
     }
+}
+
+async function getUserPermissions(nickname) {
+    const userRes = await pool.query(`SELECT is_main_admin FROM users WHERE nickname = $1`, [nickname]);
+    if (userRes.rows[0]?.is_main_admin) {
+        return { deleteMessages: true, clearChat: true, muteUsers: true, banUsers: true, assignGroups: true };
+    }
+
+    const groupRes = await pool.query(`
+        SELECT g.permissions FROM groups g
+        JOIN user_groups ug ON g.id = ug.group_id
+        JOIN users u ON u.id = ug.user_id
+        WHERE u.nickname = $1
+    `, [nickname]);
+
+    let permissions = {};
+    groupRes.rows.forEach(row => {
+        Object.assign(permissions, row.permissions);
+    });
+    return permissions;
 }
 
 async function updateUserList() {
@@ -160,6 +224,12 @@ async function getUserProfile(nickname) {
             `SELECT achievement_name FROM achievements WHERE user_id = (SELECT id FROM users WHERE nickname = $1)`,
             [nickname]
         );
+        const groupsRes = await pool.query(`
+            SELECT g.name FROM groups g
+            JOIN user_groups ug ON g.id = ug.group_id
+            JOIN users u ON u.id = ug.user_id
+            WHERE u.nickname = $1
+        `, [nickname]);
         if (userRes.rows.length === 0) return null;
         return {
             nickname: userRes.rows[0].nickname,
@@ -167,7 +237,8 @@ async function getUserProfile(nickname) {
             age: userRes.rows[0].age,
             last_seen: userRes.rows[0].last_seen,
             bio: userRes.rows[0].bio || "",
-            achievements: achievementsRes.rows.map(row => row.achievement_name)
+            achievements: achievementsRes.rows.map(row => row.achievement_name),
+            groups: groupsRes.rows.map(row => row.name)
         };
     } catch (err) {
         console.error("Ошибка получения профиля:", err.message);
@@ -196,9 +267,10 @@ io.on("connection", (socket) => {
                 socket.emit("auth error", "Этот никнейм уже зарегистрирован, используйте вход");
             } else {
                 const hashedPassword = await bcrypt.hash(password, 10);
+                const isMainAdmin = trimmedNickname === MAIN_ADMIN_NICKNAME; // Ты — главный админ
                 await pool.query(
-                    `INSERT INTO users (nickname, password, last_seen) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
-                    [trimmedNickname, hashedPassword]
+                    `INSERT INTO users (nickname, password, last_seen, is_main_admin) VALUES ($1, $2, CURRENT_TIMESTAMP, $3)`,
+                    [trimmedNickname, hashedPassword, isMainAdmin]
                 );
                 users.set(socket.id, trimmedNickname);
                 const token = generateToken(trimmedNickname);
@@ -290,7 +362,8 @@ io.on("connection", (socket) => {
         const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const messageData = { room, username, msg, timestamp, messageId, replyTo, type: "message" };
-        if (username.toLowerCase() === "admin" && msg.startsWith("/add ")) {
+        const permissions = await getUserPermissions(username);
+        if (permissions.assignGroups && msg.startsWith("/add ")) { // Только главный админ может делать объявления через /add
             const announcement = msg.slice(5).trim();
             if (announcement) {
                 messageData.msg = announcement;
@@ -306,16 +379,17 @@ io.on("connection", (socket) => {
 
     socket.on("typing", (room) => {
         const username = users.get(socket.id);
-        if (username) socket.to(room).emit("typing", username); // Только другим в комнате
+        if (username) socket.to(room).emit("typing", username);
     });
 
     socket.on("stop typing", (room) => {
-        socket.to(room).emit("stop typing"); // Только другим в комнате
+        socket.to(room).emit("stop typing");
     });
 
     socket.on("delete message", async ({ room, messageId }) => {
         const username = users.get(socket.id);
-        if (username?.toLowerCase() === "admin") { // Проверяем каждый раз
+        const permissions = await getUserPermissions(username);
+        if (permissions.deleteMessages) {
             io.to(room).emit("message deleted", messageId);
             try {
                 await pool.query(`DELETE FROM messages WHERE message_id = $1`, [messageId]);
@@ -324,13 +398,14 @@ io.on("connection", (socket) => {
                 console.error("Ошибка удаления сообщения:", err.message);
             }
         } else {
-            socket.emit("auth error", "Только админ может удалять сообщения");
+            socket.emit("auth error", "У вас нет прав на удаление сообщений");
         }
     });
 
     socket.on("clear chat", async (room) => {
         const username = users.get(socket.id);
-        if (username?.toLowerCase() === "admin") { // Проверяем каждый раз
+        const permissions = await getUserPermissions(username);
+        if (permissions.clearChat) {
             io.to(room).emit("chat cleared");
             try {
                 await pool.query(`DELETE FROM messages WHERE room = $1`, [room]);
@@ -339,29 +414,39 @@ io.on("connection", (socket) => {
                 console.error("Ошибка очистки чата:", err.message);
             }
         } else {
-            socket.emit("auth error", "Только админ может очистить чат");
+            socket.emit("auth error", "У вас нет прав на очистку чата");
         }
     });
 
-    socket.on("mute user", ({ room, targetUsername, duration }) => {
-        if (users.get(socket.id)?.toLowerCase() !== "admin") return;
-        const targetSocketId = Array.from(users.entries())
-            .find(([_, name]) => name.toLowerCase() === targetUsername.toLowerCase())?.[0];
-        if (targetSocketId) {
-            const muteEnd = Date.now() + duration * 1000;
-            mutedUsers.set(targetSocketId, muteEnd);
-            io.to(room).emit("user muted", { username: targetUsername, duration });
+    socket.on("mute user", async ({ room, targetUsername, duration }) => {
+        const username = users.get(socket.id);
+        const permissions = await getUserPermissions(username);
+        if (permissions.muteUsers) {
+            const targetSocketId = Array.from(users.entries())
+                .find(([_, name]) => name.toLowerCase() === targetUsername.toLowerCase())?.[0];
+            if (targetSocketId) {
+                const muteEnd = Date.now() + duration * 1000;
+                mutedUsers.set(targetSocketId, muteEnd);
+                io.to(room).emit("user muted", { username: targetUsername, duration });
+            }
+        } else {
+            socket.emit("auth error", "У вас нет прав на мут пользователей");
         }
     });
 
-    socket.on("ban user", ({ room, targetUsername }) => {
-        if (users.get(socket.id)?.toLowerCase() !== "admin") return;
-        const targetSocketId = Array.from(users.entries())
-            .find(([_, name]) => name.toLowerCase() === targetUsername.toLowerCase())?.[0];
-        if (targetSocketId) {
-            io.to(room).emit("user banned", targetUsername);
-            const targetSocket = io.sockets.sockets.get(targetSocketId);
-            if (targetSocket) targetSocket.disconnect(true);
+    socket.on("ban user", async ({ room, targetUsername }) => {
+        const username = users.get(socket.id);
+        const permissions = await getUserPermissions(username);
+        if (permissions.banUsers) {
+            const targetSocketId = Array.from(users.entries())
+                .find(([_, name]) => name.toLowerCase() === targetUsername.toLowerCase())?.[0];
+            if (targetSocketId) {
+                io.to(room).emit("user banned", targetUsername);
+                const targetSocket = io.sockets.sockets.get(targetSocketId);
+                if (targetSocket) targetSocket.disconnect(true);
+            }
+        } else {
+            socket.emit("auth error", "У вас нет прав на бан пользователей");
         }
     });
 
@@ -369,7 +454,8 @@ io.on("connection", (socket) => {
         const profile = await getUserProfile(targetUsername);
         if (profile) {
             const isOwnProfile = users.get(socket.id) === targetUsername;
-            socket.emit("profile data", { ...profile, isOwnProfile });
+            const permissions = await getUserPermissions(users.get(socket.id));
+            socket.emit("profile data", { ...profile, isOwnProfile, canAssignGroups: permissions.assignGroups });
         } else {
             socket.emit("auth error", "Пользователь не найден");
         }
@@ -389,6 +475,39 @@ io.on("connection", (socket) => {
         } catch (err) {
             console.error("Ошибка обновления профиля:", err.message);
             socket.emit("auth error", "Ошибка обновления профиля");
+        }
+    });
+
+    socket.on("assign group", async ({ targetUsername, groupName }) => {
+        const username = users.get(socket.id);
+        const permissions = await getUserPermissions(username);
+        if (!permissions.assignGroups) {
+            socket.emit("auth error", "У вас нет прав на назначение групп");
+            return;
+        }
+        try {
+            const groupRes = await pool.query(`SELECT id FROM groups WHERE name = $1`, [groupName]);
+            if (groupRes.rows.length === 0) {
+                socket.emit("auth error", "Группа не найдена");
+                return;
+            }
+            const groupId = groupRes.rows[0].id;
+            const userRes = await pool.query(`SELECT id FROM users WHERE nickname = $1`, [targetUsername]);
+            if (userRes.rows.length === 0) {
+                socket.emit("auth error", "Пользователь не найден");
+                return;
+            }
+            const userId = userRes.rows[0].id;
+            await pool.query(
+                `INSERT INTO user_groups (user_id, group_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                [userId, groupId]
+            );
+            socket.emit("group assigned", `${targetUsername} назначена группа ${groupName}`);
+            console.log(`${username} назначил ${targetUsername} группу ${groupName}`);
+            updateUserList();
+        } catch (err) {
+            console.error("Ошибка назначения группы:", err.message);
+            socket.emit("auth error", "Ошибка назначения группы");
         }
     });
 
