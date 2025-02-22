@@ -273,6 +273,14 @@
         .reply-btn:hover {
             background: #00897B;
         }
+        #cancel-reply-btn {
+            background: #EF5350;
+            padding: 8px 12px;
+            margin-left: 10px;
+        }
+        #cancel-reply-btn:hover {
+            background: #D81B60;
+        }
         .admin-icon {
             background: none;
             padding: 5px;
@@ -498,6 +506,10 @@
                 width: auto;
                 min-width: 50px;
             }
+            #cancel-reply-btn {
+                padding: 10px;
+                font-size: 14px;
+            }
             select {
                 width: 100%;
                 margin: 10px 0;
@@ -592,6 +604,7 @@
                 <input id="message-input" type="text" placeholder="Напиши сообщение...">
                 <button id="emoji-button">😊</button>
                 <button onclick="sendMessage()">Отправить</button>
+                <button id="cancel-reply-btn" class="hidden" onclick="cancelReply()">Отмена</button>
             </div>
             <div id="typing-status"></div>
             <emoji-picker id="emoji-picker"></emoji-picker>
@@ -648,6 +661,7 @@
         const userCount = document.getElementById("user-count");
         const adminControls = document.getElementById("admin-controls");
         const profileModal = document.getElementById("profile-modal");
+        const cancelReplyBtn = document.getElementById("cancel-reply-btn");
 
         socket.off("chat message");
         socket.off("chat history");
@@ -715,6 +729,7 @@
                 messageInput.value = "";
                 replyingTo = null;
                 messageInput.placeholder = "Напиши сообщение...";
+                cancelReplyBtn.classList.add("hidden");
             }
         }
 
@@ -723,6 +738,13 @@
             const repliedMessage = document.querySelector(`[data-message-id="${messageId}"] p`).textContent;
             messageInput.placeholder = `Ответ на: "${repliedMessage.slice(0, 20)}..."`;
             messageInput.focus();
+            cancelReplyBtn.classList.remove("hidden");
+        }
+
+        function cancelReply() {
+            replyingTo = null;
+            messageInput.placeholder = "Напиши сообщение...";
+            cancelReplyBtn.classList.add("hidden");
         }
 
         function scrollToMessage(messageId) {
@@ -903,11 +925,11 @@
         });
 
         socket.on("typing", (username) => {
-            document.getElementById("typing-status").innerText = `${username} пишет...`;
+            document.getElementById("typing-status").textContent = `${username} пишет...`;
         });
 
         socket.on("stop typing", () => {
-            document.getElementById("typing-status").innerText = "";
+            document.getElementById("typing-status").textContent = "";
         });
 
         messageInput.addEventListener("keypress", function(event) {
