@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Мой чат</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Для адаптивности на телефоне -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body {
             background: linear-gradient(135deg, #E8DAEF, #F5F5F5);
@@ -13,6 +13,7 @@
             align-items: center;
             min-height: 100vh;
             color: #333;
+            overflow-x: hidden;
         }
         .chat-room, .username-container {
             width: 90%;
@@ -177,11 +178,14 @@
             background: #00897B;
         }
         emoji-picker {
-            position: absolute;
+            position: fixed;
+            bottom: 80px;
+            left: 10px;
             display: none;
             z-index: 1000;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
             border-radius: 10px;
+            background: #FFFFFF;
         }
         .input-container {
             display: flex;
@@ -213,6 +217,7 @@
             padding: 15px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(155, 89, 182, 0.1);
+            transition: transform 0.3s ease;
         }
         .users-panel h3 {
             margin: 0 0 15px 0;
@@ -287,54 +292,116 @@
             color: #78909C;
             margin-top: 10px;
         }
+        .hamburger {
+            display: none;
+            font-size: 24px;
+            background: none;
+            border: none;
+            color: #9B59B6;
+            cursor: pointer;
+            padding: 10px;
+        }
+        .users-panel.hidden {
+            transform: translateY(100%);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            margin: 0;
+            height: auto;
+            max-height: 50vh;
+            overflow-y: auto;
+            z-index: 1000;
+            border-radius: 15px 15px 0 0;
+        }
 
         /* Адаптивность для телефонов */
         @media (max-width: 768px) {
+            body {
+                align-items: flex-start;
+                padding-bottom: 80px; /* Отступ для фиксированного ввода */
+            }
             .chat-room, .username-container {
                 flex-direction: column;
-                width: 95%;
-                padding: 15px;
-                max-width: none;
+                width: 100%;
+                padding: 10px;
+                box-shadow: none;
+                border-radius: 0;
+                min-height: 100vh;
+            }
+            .chat-container {
+                width: 100%;
+            }
+            .hamburger {
+                display: block;
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                z-index: 1100;
             }
             .users-panel {
+                display: none; /* Скрываем по умолчанию */
                 width: 100%;
-                margin-left: 0;
-                margin-top: 15px;
+                margin: 0;
+                padding: 10px;
+                box-shadow: 0 -4px 15px rgba(155, 89, 182, 0.1);
+            }
+            .users-panel.visible {
+                display: block;
             }
             #messages {
-                height: 60vh; /* Уменьшаем высоту на маленьких экранах */
+                height: calc(100vh - 200px); /* Остаток экрана минус ввод и шапка */
+                margin-bottom: 80px; /* Отступ для фиксированного ввода */
             }
             #message-input {
                 width: 100%;
-                margin-bottom: 10px;
+                padding: 15px;
+                font-size: 16px;
             }
             .input-container {
-                flex-direction: column;
-                align-items: stretch;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                background: #FFFFFF;
+                padding: 10px;
+                box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.1);
+                flex-direction: row;
+                align-items: center;
+                gap: 5px;
+                z-index: 1000;
             }
             #emoji-button, button {
-                width: 100%;
-                margin: 5px 0;
+                padding: 15px;
+                font-size: 18px;
+                width: auto;
+                min-width: 50px;
             }
             select {
                 width: 100%;
+                margin: 10px 0;
             }
             .message, .announcement {
-                max-width: 90%;
+                max-width: 85%;
+                padding: 10px 15px;
+            }
+            .delete-btn, .reply-btn {
+                padding: 8px 12px;
+                font-size: 14px;
             }
             .delete-btn {
                 right: 5px;
-                top: 5px;
             }
             .reply-btn {
-                right: 60px;
-                top: 5px;
+                right: 65px;
             }
             .username-container h2 {
                 font-size: 1.5em;
             }
             #username-input, #password-input {
                 width: 100%;
+                padding: 15px;
+                font-size: 16px;
             }
             #password-container {
                 width: 90%;
@@ -342,6 +409,11 @@
                 transform: translateX(-50%);
                 top: 50%;
                 padding: 15px;
+            }
+            emoji-picker {
+                bottom: 90px;
+                left: 10px;
+                width: calc(100% - 20px);
             }
         }
     </style>
@@ -360,6 +432,7 @@
         </div>
     </div>
     <div class="chat-room hidden">
+        <button class="hamburger" onclick="toggleUsersPanel()">☰</button>
         <div class="chat-container">
             <select id="room-select" onchange="joinRoom()">
                 <option value="room1">Комната 1</option>
@@ -369,12 +442,12 @@
             <div class="input-container">
                 <input id="message-input" type="text" placeholder="Напиши сообщение...">
                 <button id="emoji-button">😊</button>
-                <button onclick="sendMessage()">Отправить</button>
+                <button onclick="sendMessage()">➤</button>
             </div>
             <div id="typing-status"></div>
             <emoji-picker id="emoji-picker"></emoji-picker>
         </div>
-        <div class="users-panel">
+        <div class="users-panel hidden">
             <h3>Пользователи</h3>
             <ul id="users-list"></ul>
             <div class="admin-controls hidden" id="admin-controls">
@@ -403,6 +476,7 @@
         const passwordInput = document.getElementById("password-input");
         const passwordError = document.getElementById("password-error");
         const adminControls = document.getElementById("admin-controls");
+        const usersPanel = document.querySelector(".users-panel");
 
         function setUsername() {
             username = usernameInput.value.trim();
@@ -424,6 +498,11 @@
             const password = passwordInput.value;
             socket.emit("set username", { username, password });
             passwordInput.value = "";
+        }
+
+        function toggleUsersPanel() {
+            usersPanel.classList.toggle("hidden");
+            usersPanel.classList.toggle("visible");
         }
 
         socket.on("username set", (setUsername) => {
@@ -652,7 +731,10 @@
         emojiButton.addEventListener("click", () => {
             const isVisible = emojiPicker.style.display === "block";
             emojiPicker.style.display = isVisible ? "none" : "block";
-            if (!isVisible) {
+            if (!isVisible && window.innerWidth <= 768) {
+                emojiPicker.style.bottom = "90px";
+                emojiPicker.style.left = "10px";
+            } else if (!isVisible) {
                 emojiPicker.style.top = `${messageInput.offsetTop - 300}px`;
                 emojiPicker.style.left = `${messageInput.offsetLeft}px`;
             }
