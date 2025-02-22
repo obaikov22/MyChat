@@ -589,8 +589,8 @@
         <h2>Вход / Регистрация</h2>
         <input id="nickname-input" type="text" placeholder="Твой ник">
         <input id="password-input" type="password" placeholder="Пароль">
-        <button onclick="register()">Зарегистрироваться</button>
-        <button onclick="login()">Войти</button>
+        <button onclick="register()">Зарегистрироваться</button> <!-- TODO -->
+        <button onclick="login()">Войти</button> <!-- TODO -->
         <div id="auth-error"></div>
     </div>
     <div class="chat-room hidden">
@@ -684,23 +684,18 @@
             socket.emit("auto login", token);
         }
 
-        function register() {
-            const nickname = nicknameInput.value.trim();
-            const password = passwordInput.value.trim();
-            console.log("Регистрация:", nickname, password);
-            if (nickname && password) {
-                socket.emit("register", { nickname, password });
-            } else {
-                authError.innerText = "Ник и пароль обязательны";
+        passwordInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                auth();
             }
-        }
+        });
 
-        function login() {
+        function auth() { 
             const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
-            console.log("Вход:", nickname, password);
+            console.log("Авторизация:", nickname, password);
             if (nickname && password) {
-                socket.emit("login", { nickname, password });
+                socket.emit("auth", { nickname, password });
             } else {
                 authError.innerText = "Ник и пароль обязательны";
             }

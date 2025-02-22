@@ -246,6 +246,60 @@ io.on("connection", (socket) => {
     console.log("Пользователь подключился:", socket.id);
     updateUserList();
 
+    socket.on("auth", async ({ nickname, password }) => {
+        const trimmedNickname = nickname.trim();
+        const lowerNickname = trimmedNickname.toLowerCase();
+
+        const trimmedPassword = password.trim();
+
+        try {
+            const users = (await pool.query(`SELECT * FROM users WHERE nickname = $1`, [trimmedNickname])).rows;
+            const isUserFound = users.length > 0;
+
+            if (!isUserFound) {
+                if (blacklistedNicknames.includes(lowerNickname)) {
+                    socket.emit("auth error", "Этот никнейм запрещён");
+                    return;
+                }
+
+                const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
+                const isMainAdmin = trimmedNickname === MAIN_ADMIN_NICKNAME;
+                await pool.query(
+                    `INSERT INTO users (nickname, password, last_seen, is_main_admin) VALUES ($1, $2, CURRENT_TIMESTAMP, $3)`,
+                    [trimmedNickname, hashedPassword, isMainAdmin]
+                );
+                users.set(socket.id, trimmedNickname);
+                const token = generateToken(trimmedNickname);
+                const permissions = await getUserPermissions(trimmedNickname);
+                socket.emit("auth success", { nickname: trimmedNickname, token, permissions });
+                console.log(`Пользователь ${trimmedNickname} успешно зарегистрирован`);
+                updateUserList();
+            } else {
+                const [user] = users;
+
+                const userMatch = await bcrypt.compare(trimmedPassword, user.password);
+                if (userMatch) {
+                    if (Array.from(users.values()).includes(trimmedNickname)) {
+                        socket.emit("auth error", "Пользователь уже в сети");
+                    } else {
+                        users.set(socket.id, trimmedNickname);
+                        await pool.query(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE nickname = $1`, [trimmedNickname]);
+                        const token = generateToken(trimmedNickname);
+                        const permissions = await getUserPermissions(trimmedNickname);
+                        socket.emit("auth success", { nickname: trimmedNickname, token, permissions });
+                        console.log(`${trimmedNickname} вошёл`);
+                        updateUserList();
+                    }
+                } else {
+                    socket.emit("auth error", "Неверный пароль");
+                } 
+            }
+        } catch (error) {
+            console.error("Ошибка авторизации:", error.message);
+            socket.emit("auth error", "Ошибка сервера");
+        }
+    });
+
     socket.on("register", async ({ nickname, password }) => {
         const trimmedNickname = nickname.trim();
         const lowerNickname = trimmedNickname.toLowerCase();
