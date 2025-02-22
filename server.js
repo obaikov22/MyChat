@@ -300,8 +300,14 @@ io.on("connection", (socket) => {
         users.delete(socket.id);
         mutedUsers.delete(socket.id);
         console.log(`${username} отключился`);
-        // Обновляем список пользователей сразу после отключения
-        currentRooms.forEach(room => updateRoomUsers(room));
+        // Принудительно обновляем список пользователей во всех комнатах
+        currentRooms.forEach(room => {
+            updateRoomUsers(room);
+            // Дополнительно отправляем событие всем клиентам в комнате
+            io.to(room).emit("update users", Array.from(io.sockets.adapter.rooms.get(room) || [])
+                .map(socketId => users.get(socketId))
+                .filter(username => username));
+        });
     });
 });
 

@@ -423,9 +423,10 @@
         const usersList = document.getElementById("users-list");
         const adminControls = document.getElementById("admin-controls");
 
-        // Очищаем обработчики при переподключении, чтобы избежать дублей
+        // Очищаем старые обработчики при загрузке
         socket.off("chat message");
         socket.off("chat history");
+        socket.off("update users");
 
         function register() {
             const nickname = nicknameInput.value.trim();
@@ -571,7 +572,6 @@
                     <span class="reply-text">${document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || "Сообщение удалено"}</span>
                 </div>
             ` : "";
-            // Проверяем, не существует ли сообщение с таким ID
             if (!document.querySelector(`[data-message-id="${messageId}"]`)) {
                 messages.innerHTML += `
                     <div class="message" data-message-id="${messageId}">
@@ -628,23 +628,6 @@
             alert(`${username} забанен`);
         });
 
-        let typingTimeout;
-        messageInput.addEventListener("input", () => {
-            socket.emit("typing", currentRoom);
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                socket.emit("stop typing", currentRoom);
-            }, 1000);
-        });
-
-        socket.on("typing", (username) => {
-            document.getElementById("typing-status").innerText = `${username} пишет...`;
-        });
-
-        socket.on("stop typing", () => {
-            document.getElementById("typing-status").innerText = "";
-        });
-
         socket.on("update users", (roomUsers) => {
             usersList.innerHTML = "";
             roomUsers.forEach(user => {
@@ -668,6 +651,23 @@
                 }
                 usersList.appendChild(li);
             });
+        });
+
+        let typingTimeout;
+        messageInput.addEventListener("input", () => {
+            socket.emit("typing", currentRoom);
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit("stop typing", currentRoom);
+            }, 1000);
+        });
+
+        socket.on("typing", (username) => {
+            document.getElementById("typing-status").innerText = `${username} пишет...`;
+        });
+
+        socket.on("stop typing", () => {
+            document.getElementById("typing-status").innerText = "";
         });
 
         messageInput.addEventListener("keypress", function(event) {
