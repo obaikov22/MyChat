@@ -63,7 +63,7 @@
         }
         #nickname-input, #password-input {
             width: 50%;
-            padding: 10px;
+            padding: 12px;
             border: none;
             border-radius: 25px;
             background: #F2E7FE;
@@ -232,6 +232,11 @@
             align-items: center;
             font-size: 0.95em;
             cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .users-panel li:hover {
+            background: rgba(155, 89, 182, 0.1);
+            border-radius: 5px;
         }
         .users-panel li.offline {
             color: #999;
@@ -246,6 +251,7 @@
             background: #26A69A;
             display: block;
             width: 100%;
+            transition: background 0.3s ease;
         }
         .admin-btn:hover {
             background: #00897B;
@@ -297,40 +303,61 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6);
             justify-content: center;
             align-items: center;
             z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         .modal-content {
             background: #FFFFFF;
             padding: 20px;
-            border-radius: 10px;
-            width: 300px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border-radius: 20px;
+            width: 350px;
+            max-width: 90%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
             position: relative;
+            transform: translateY(-20px);
+            animation: slideIn 0.3s ease forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
         .modal-content img {
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
             object-fit: cover;
-            margin-right: 15px;
+            border: 3px solid #9B59B6;
+            transition: transform 0.3s ease;
+        }
+        .modal-content img:hover {
+            transform: scale(1.05);
         }
         .profile-header {
             display: flex;
             align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
         }
         .profile-info {
             flex-grow: 1;
         }
         .profile-info h4 {
             margin: 0;
-            font-size: 1.2em;
+            font-size: 1.5em;
+            color: #333;
+            font-weight: 600;
         }
         .profile-info .status {
-            font-size: 0.9em;
+            font-size: 0.95em;
             color: #78909C;
+            margin: 5px 0;
         }
         .profile-info .status.online::before {
             content: "● ";
@@ -340,50 +367,89 @@
             content: "● ";
             color: #999;
         }
+        .profile-info .age {
+            font-size: 0.9em;
+            color: #555;
+            margin: 5px 0;
+        }
         .achievements {
-            margin: 10px 0;
+            margin: 15px 0;
             display: flex;
-            gap: 5px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         .achievement {
-            background: #E8DAEF;
-            padding: 5px 10px;
-            border-radius: 15px;
+            background: linear-gradient(135deg, #E8DAEF, #D1C4E9);
+            padding: 6px 12px;
+            border-radius: 20px;
             font-size: 0.85em;
+            color: #9B59B6;
+            font-weight: 500;
+            box-shadow: 0 2px 5px rgba(155, 89, 182, 0.2);
         }
         .bio {
             font-style: italic;
-            color: #555;
-            margin-top: 10px;
+            color: #666;
+            margin: 15px 0;
+            padding: 10px;
+            background: #F9F9F9;
+            border-radius: 10px;
+            font-size: 0.95em;
+            line-height: 1.4;
         }
         .close-btn {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 15px;
+            right: 15px;
             background: none;
             border: none;
-            font-size: 1.2em;
+            font-size: 1.5em;
+            color: #999;
             cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        .close-btn:hover {
+            color: #EF5350;
         }
         .edit-form {
             display: none;
-            margin-top: 15px;
+            margin-top: 20px;
+            animation: fadeSlideIn 0.3s ease;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .edit-form input, .edit-form textarea {
             width: 100%;
-            padding: 8px;
-            margin: 5px 0;
+            padding: 10px;
+            margin: 8px 0;
             border: 1px solid #E0E0E0;
-            border-radius: 5px;
+            border-radius: 10px;
             box-sizing: border-box;
+            font-size: 0.95em;
+            background: #F9F9F9;
+            transition: border-color 0.3s ease;
+        }
+        .edit-form input:focus, .edit-form textarea:focus {
+            border-color: #9B59B6;
+            outline: none;
         }
         .edit-form textarea {
-            height: 60px;
+            height: 80px;
             resize: none;
         }
         .edit-form button {
             margin-top: 10px;
             width: 48%;
+            font-size: 1em;
+        }
+        .edit-form button:nth-child(2) {
+            background: #EF5350;
+            margin-left: 4%;
+        }
+        .edit-form button:nth-child(2):hover {
+            background: #D81B60;
         }
 
         @media (max-width: 768px) {
@@ -462,8 +528,8 @@
             }
             .auth-container button {
                 width: 48%;
-                padding: 10px 15px;
-                font-size: 14px;
+                padding: 12px 15px;
+                font-size: 16px;
                 margin: 5px 1%;
             }
             emoji-picker {
@@ -472,8 +538,36 @@
                 width: calc(100% - 20px);
                 max-height: 50vh;
             }
+            .modal {
+                align-items: flex-start;
+                padding-top: 20px;
+            }
             .modal-content {
-                width: 90%;
+                width: 100%;
+                max-width: 100%;
+                height: calc(100vh - 40px);
+                margin: 0 10px;
+                border-radius: 15px 15px 0 0;
+                overflow-y: auto;
+                padding: 25px;
+            }
+            .modal-content img {
+                width: 80px;
+                height: 80px;
+            }
+            .profile-info h4 {
+                font-size: 1.3em;
+            }
+            .profile-info .status, .profile-info .age {
+                font-size: 0.85em;
+            }
+            .edit-form input, .edit-form textarea {
+                font-size: 1em;
+                padding: 12px;
+            }
+            .edit-form button {
+                padding: 12px;
+                font-size: 1em;
             }
         }
     </style>
@@ -863,7 +957,7 @@
             });
             document.getElementById("profile-bio").textContent = bio || "Нет подписи";
             const editBtn = document.getElementById("edit-profile-btn");
-            editBtn.style.display = isOwnProfile ? "block" : "none"; // Показываем только владельцу
+            editBtn.style.display = isOwnProfile ? "block" : "none";
             profileModal.style.display = "flex";
         });
 
