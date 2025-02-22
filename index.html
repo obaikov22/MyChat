@@ -231,6 +231,7 @@
             justify-content: space-between;
             align-items: center;
             font-size: 0.95em;
+            cursor: pointer;
         }
         .users-panel li.offline {
             color: #999;
@@ -288,6 +289,101 @@
             font-size: 0.9em;
             color: #78909C;
             margin-top: 10px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #FFFFFF;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+        .modal-content img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 15px;
+        }
+        .profile-header {
+            display: flex;
+            align-items: center;
+        }
+        .profile-info {
+            flex-grow: 1;
+        }
+        .profile-info h4 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+        .profile-info .status {
+            font-size: 0.9em;
+            color: #78909C;
+        }
+        .profile-info .status.online::before {
+            content: "● ";
+            color: #26A69A;
+        }
+        .profile-info .status.offline::before {
+            content: "● ";
+            color: #999;
+        }
+        .achievements {
+            margin: 10px 0;
+            display: flex;
+            gap: 5px;
+        }
+        .achievement {
+            background: #E8DAEF;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+        }
+        .bio {
+            font-style: italic;
+            color: #555;
+            margin-top: 10px;
+        }
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+        .edit-form {
+            display: none;
+            margin-top: 15px;
+        }
+        .edit-form input, .edit-form textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #E0E0E0;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .edit-form textarea {
+            height: 60px;
+            resize: none;
+        }
+        .edit-form button {
+            margin-top: 10px;
+            width: 48%;
         }
 
         @media (max-width: 768px) {
@@ -376,6 +472,9 @@
                 width: calc(100% - 20px);
                 max-height: 50vh;
             }
+            .modal-content {
+                width: 90%;
+            }
         }
     </style>
 </head>
@@ -411,6 +510,29 @@
             </div>
         </div>
     </div>
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeProfileModal()">✖</button>
+            <div class="profile-header">
+                <img id="profile-avatar" src="default-avatar.png" alt="Avatar">
+                <div class="profile-info">
+                    <h4 id="profile-nickname"></h4>
+                    <p id="profile-age" class="age"></p>
+                    <p id="profile-status" class="status"></p>
+                </div>
+            </div>
+            <div id="profile-achievements" class="achievements"></div>
+            <div id="profile-bio" class="bio"></div>
+            <button id="edit-profile-btn" class="admin-btn hidden" onclick="showEditForm()">Редактировать</button>
+            <div id="edit-form" class="edit-form">
+                <input type="file" id="edit-avatar" accept="image/*">
+                <input type="number" id="edit-age" placeholder="Возраст (опционально)" min="1" max="150">
+                <textarea id="edit-bio" placeholder="Подпись"></textarea>
+                <button onclick="saveProfile()">Сохранить</button>
+                <button onclick="cancelEdit()">Отмена</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/emoji-picker/index.js" type="module"></script>
@@ -431,12 +553,12 @@
         const usersList = document.getElementById("users-list");
         const userCount = document.getElementById("user-count");
         const adminControls = document.getElementById("admin-controls");
+        const profileModal = document.getElementById("profile-modal");
 
         socket.off("chat message");
         socket.off("chat history");
         socket.off("update users");
 
-        // Проверяем токен при загрузке страницы
         const token = localStorage.getItem("chatToken");
         if (token) {
             socket.emit("auto login", token);
@@ -467,7 +589,7 @@
         socket.on("auth success", ({ nickname, token }) => {
             console.log("Успешная авторизация:", nickname);
             username = nickname;
-            localStorage.setItem("chatToken", token); // Сохраняем токен
+            localStorage.setItem("chatToken", token);
             authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
             if (username.toLowerCase() === "admin") {
@@ -479,7 +601,7 @@
         socket.on("auth error", (message) => {
             console.log("Ошибка авторизации:", message);
             authError.innerText = message;
-            localStorage.removeItem("chatToken"); // Удаляем токен при ошибке
+            localStorage.removeItem("chatToken");
         });
 
         socket.on("muted", (message) => {
@@ -651,6 +773,7 @@
             users.forEach(user => {
                 const li = document.createElement("li");
                 li.textContent = user;
+                li.onclick = () => showProfile(user);
                 const isOnline = onlineUsers.includes(user);
                 if (!isOnline) {
                     li.classList.add("offline");
@@ -662,12 +785,12 @@
                     muteIcon.innerHTML = "🔇";
                     muteIcon.className = "admin-icon";
                     muteIcon.title = "Мут";
-                    muteIcon.onclick = () => muteUser(user);
+                    muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user); };
                     const banIcon = document.createElement("button");
                     banIcon.innerHTML = "🚫";
                     banIcon.className = "admin-icon";
                     banIcon.title = "Бан";
-                    banIcon.onclick = () => banUser(user);
+                    banIcon.onclick = (e) => { e.stopPropagation(); banUser(user); };
                     li.appendChild(muteIcon);
                     li.appendChild(banIcon);
                 }
@@ -716,6 +839,71 @@
             emojiPicker.style.display = "none";
             messageInput.focus();
         });
+
+        // Profile Modal Functions
+        function showProfile(targetUsername) {
+            socket.emit("get profile", targetUsername);
+        }
+
+        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, isOwnProfile }) => {
+            document.getElementById("profile-nickname").textContent = nickname;
+            document.getElementById("profile-avatar").src = avatar;
+            document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
+            const statusEl = document.getElementById("profile-status");
+            const onlineUsers = usersList.querySelectorAll("li:not(.offline)").length;
+            const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));
+            statusEl.className = "status " + (isOnline ? "online" : "offline");
+            statusEl.textContent = isOnline ? "Онлайн" : `Последний раз: ${new Date(last_seen).toLocaleString()}`;
+            const achievementsEl = document.getElementById("profile-achievements");
+            achievementsEl.innerHTML = "";
+            achievements.forEach(ach => {
+                const span = document.createElement("span");
+                span.className = "achievement";
+                span.textContent = ach;
+                achievementsEl.appendChild(span);
+            });
+            document.getElementById("profile-bio").textContent = bio || "Нет подписи";
+            const editBtn = document.getElementById("edit-profile-btn");
+            editBtn.classList.toggle("hidden", !isOwnProfile);
+            profileModal.style.display = "flex";
+        });
+
+        function closeProfileModal() {
+            profileModal.style.display = "none";
+            document.getElementById("edit-form").style.display = "none";
+        }
+
+        function showEditForm() {
+            document.getElementById("edit-form").style.display = "block";
+            document.getElementById("edit-age").value = document.getElementById("profile-age").textContent.replace("Возраст: ", "") || "";
+            document.getElementById("edit-bio").value = document.getElementById("profile-bio").textContent === "Нет подписи" ? "" : document.getElementById("profile-bio").textContent;
+        }
+
+        function saveProfile() {
+            const avatarFile = document.getElementById("edit-avatar").files[0];
+            const age = document.getElementById("edit-age").value;
+            const bio = document.getElementById("edit-bio").value;
+
+            if (avatarFile) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    socket.emit("update profile", { avatar: reader.result, age: age || null, bio });
+                };
+                reader.readAsDataURL(avatarFile);
+            } else {
+                socket.emit("update profile", { avatar: null, age: age || null, bio });
+            }
+            closeProfileModal();
+        }
+
+        socket.on("profile updated", (message) => {
+            console.log(message);
+            showProfile(username); // Обновляем профиль после сохранения
+        });
+
+        function cancelEdit() {
+            document.getElementById("edit-form").style.display = "none";
+        }
     </script>
 </body>
 </html>

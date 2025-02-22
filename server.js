@@ -12,7 +12,7 @@ const io = new Server(server);
 
 // Подключаемся к PostgreSQL (замени URL на свой из Render)
 const pool = new Pool({
-    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7", // Вставь Internal Database URL из Render
+    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7",
     ssl: { rejectUnauthorized: false }
 });
 
@@ -29,7 +29,11 @@ pool.query(`
     CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         nickname TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        avatar TEXT,
+        age INTEGER,
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        bio TEXT
     )
 `, (err) => {
     if (err) console.error("Ошибка создания таблицы users:", err.message);
@@ -52,6 +56,17 @@ pool.query(`
     else console.log("Таблица messages готова");
 });
 
+pool.query(`
+    CREATE TABLE IF NOT EXISTS achievements (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        achievement_name TEXT NOT NULL
+    )
+`, (err) => {
+    if (err) console.error("Ошибка создания таблицы achievements:", err.message);
+    else console.log("Таблица achievements готова");
+});
+
 app.get("/", (req, res) => {
     res.sendFile(__dirname + "/index.html");
 });
@@ -67,10 +82,10 @@ const blacklistedNicknames = [
 
 const adminPassword = "MySecretPassword123";
 const MAX_MESSAGES = 100;
-const JWT_SECRET = "MySecretPassword123"; // Секретный ключ для JWT (замени на свой)
+const JWT_SECRET = "myChatAppSecret123"; // Замени на свой уникальный ключ
 
 function generateToken(nickname) {
-    return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "10m" }); // Токен на 10 минут
+    return jwt.sign({ nickname }, JWT_SECRET, { expiresIn: "10m" });
 }
 
 async function verifyToken(token) {
@@ -85,26 +100,23 @@ async function verifyToken(token) {
 
 async function updateUserList() {
     try {
-        const allUsersRes = await pool.query(`SELECT nickname FROM users`);
-        const allUsers = allUsersRes.rows.map(row => row.nickname);
-        console.log("Все пользователи из базы:", allUsers);
-
+        const allUsersRes = await pool.query(`SELECT nickname, last_seen FROM users`);
+        const allUsers = allUsersRes.rows.map(row => ({
+            nickname: row.nickname,
+            last_seen: row.last_seen
+        }));
         const onlineUsers = Array.from(users.values());
-        console.log("Онлайн пользователи:", onlineUsers);
-
         const userList = allUsers.sort((a, b) => {
-            const aOnline = onlineUsers.includes(a);
-            const bOnline = onlineUsers.includes(b);
+            const aOnline = onlineUsers.includes(a.nickname);
+            const bOnline = onlineUsers.includes(b.nickname);
             return bOnline - aOnline;
-        });
-        console.log("Отсортированный список:", userList);
+        }).map(user => user.nickname);
 
         io.emit("update users", {
             users: userList,
             onlineCount: onlineUsers.length,
             totalCount: allUsers.length
         });
-        console.log(`Отправлено: онлайн ${onlineUsers.length}/${allUsers.length}`);
     } catch (err) {
         console.error("Ошибка обновления списка пользователей:", err.message);
     }
@@ -117,8 +129,6 @@ async function saveMessage({ room, username, msg, timestamp, messageId, replyTo,
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [room, username, msg, timestamp, messageId, replyTo || null, type]
         );
-        console.log("Сообщение сохранено");
-
         await pool.query(`
             DELETE FROM messages 
             WHERE room = $1 AND id NOT IN (
@@ -153,13 +163,37 @@ async function getChatHistory(room) {
     }
 }
 
+async function getUserProfile(nickname) {
+    try {
+        const userRes = await pool.query(
+            `SELECT nickname, avatar, age, last_seen, bio FROM users WHERE nickname = $1`,
+            [nickname]
+        );
+        const achievementsRes = await pool.query(
+            `SELECT achievement_name FROM achievements WHERE user_id = (SELECT id FROM users WHERE nickname = $1)`,
+            [nickname]
+        );
+        if (userRes.rows.length === 0) return null;
+        return {
+            nickname: userRes.rows[0].nickname,
+            avatar: userRes.rows[0].avatar || "default-avatar.png",
+            age: userRes.rows[0].age,
+            last_seen: userRes.rows[0].last_seen,
+            bio: userRes.rows[0].bio || "",
+            achievements: achievementsRes.rows.map(row => row.achievement_name)
+        };
+    } catch (err) {
+        console.error("Ошибка получения профиля:", err.message);
+        return null;
+    }
+}
+
 io.on("connection", (socket) => {
     console.log("Пользователь подключился:", socket.id);
 
     updateUserList();
 
     socket.on("register", async ({ nickname, password }) => {
-        console.log(`Регистрация: ${nickname}`);
         const trimmedNickname = nickname.trim();
         const lowerNickname = trimmedNickname.toLowerCase();
 
@@ -180,7 +214,7 @@ io.on("connection", (socket) => {
             } else {
                 const hashedPassword = await bcrypt.hash(password, 10);
                 await pool.query(
-                    `INSERT INTO users (nickname, password) VALUES ($1, $2)`,
+                    `INSERT INTO users (nickname, password, last_seen) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
                     [trimmedNickname, hashedPassword]
                 );
                 users.set(socket.id, trimmedNickname);
@@ -196,7 +230,6 @@ io.on("connection", (socket) => {
     });
 
     socket.on("login", async ({ nickname, password }) => {
-        console.log(`Вход: ${nickname}`);
         const trimmedNickname = nickname.trim();
         const lowerNickname = trimmedNickname.toLowerCase();
 
@@ -216,6 +249,7 @@ io.on("connection", (socket) => {
                         socket.emit("auth error", "Этот никнейм уже используется");
                     } else {
                         users.set(socket.id, trimmedNickname);
+                        await pool.query(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE nickname = $1`, [trimmedNickname]);
                         const token = generateToken(trimmedNickname);
                         socket.emit("auth success", { nickname: trimmedNickname, token });
                         console.log(`${trimmedNickname} вошёл`);
@@ -238,6 +272,7 @@ io.on("connection", (socket) => {
                 socket.emit("auth error", "Этот никнейм уже используется");
             } else {
                 users.set(socket.id, nickname);
+                await pool.query(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE nickname = $1`, [nickname]);
                 socket.emit("auth success", { nickname, token });
                 console.log(`${nickname} вошёл автоматически`);
                 updateUserList();
@@ -350,9 +385,39 @@ io.on("connection", (socket) => {
         }
     });
 
+    socket.on("get profile", async (targetUsername) => {
+        const profile = await getUserProfile(targetUsername);
+        if (profile) {
+            const isOwnProfile = users.get(socket.id) === targetUsername;
+            socket.emit("profile data", { ...profile, isOwnProfile });
+        } else {
+            socket.emit("auth error", "Пользователь не найден");
+        }
+    });
+
+    socket.on("update profile", async ({ avatar, age, bio }) => {
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
+
+        try {
+            await pool.query(
+                `UPDATE users SET avatar = $1, age = $2, bio = $3 WHERE nickname = $4`,
+                [avatar || null, age || null, bio || null, nickname]
+            );
+            socket.emit("profile updated", "Профиль обновлён");
+            console.log(`Профиль ${nickname} обновлён`);
+            updateUserList();
+        } catch (err) {
+            console.error("Ошибка обновления профиля:", err.message);
+            socket.emit("auth error", "Ошибка обновления профиля");
+        }
+    });
+
     socket.on("disconnect", () => {
         const username = users.get(socket.id);
-        const currentRooms = Array.from(socket.rooms).filter(r => r !== socket.id);
+        if (username) {
+            pool.query(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE nickname = $1`, [username]);
+        }
         users.delete(socket.id);
         mutedUsers.delete(socket.id);
         console.log(`${username} отключился`);
