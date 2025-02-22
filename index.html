@@ -15,7 +15,7 @@
             color: #333;
             overflow-x: hidden;
         }
-        .chat-room, .username-container {
+        .chat-room, .auth-container {
             width: 90%;
             max-width: 1100px;
             background: #FFFFFF;
@@ -62,7 +62,7 @@
             border-color: #9B59B6;
             box-shadow: 0 0 5px rgba(155, 89, 182, 0.3);
         }
-        #username-input, #password-input {
+        #nickname-input, #password-input {
             width: 60%;
             padding: 12px 15px;
             border: none;
@@ -195,19 +195,16 @@
         .hidden {
             display: none;
         }
-        #username-error, #password-error {
+        #auth-error {
             color: #EF5350;
             font-size: 0.9em;
             margin-top: 5px;
         }
-        #password-container {
-            position: absolute;
-            background: #FFFFFF;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(155, 89, 182, 0.2);
-            z-index: 1000;
-            display: none;
+        .auth-toggle {
+            color: #9B59B6;
+            cursor: pointer;
+            margin-top: 10px;
+            text-decoration: underline;
         }
         .users-panel {
             width: 250px;
@@ -291,13 +288,12 @@
             margin-top: 10px;
         }
 
-        /* Адаптивность для телефонов */
         @media (max-width: 768px) {
             body {
                 align-items: flex-start;
                 padding: 10px;
             }
-            .chat-room, .username-container {
+            .chat-room, .auth-container {
                 flex-direction: column;
                 width: 100%;
                 padding: 15px;
@@ -316,7 +312,7 @@
                 box-shadow: 0 4px 15px rgba(155, 89, 182, 0.1);
             }
             #messages {
-                height: calc(100vh - 200px); /* Учитываем шапку и ввод */
+                height: calc(100vh - 200px);
                 margin-bottom: 15px;
             }
             #message-input {
@@ -359,20 +355,13 @@
             .reply-btn {
                 right: 60px;
             }
-            .username-container h2 {
+            .auth-container h2 {
                 font-size: 1.5em;
             }
-            #username-input, #password-input {
+            #nickname-input, #password-input {
                 width: 100%;
                 padding: 15px;
                 font-size: 16px;
-            }
-            #password-container {
-                width: 90%;
-                left: 50%;
-                transform: translateX(-50%);
-                top: 50%;
-                padding: 15px;
             }
             emoji-picker {
                 bottom: 70px;
@@ -384,17 +373,13 @@
     </style>
 </head>
 <body>
-    <div class="username-container">
-        <h2>Введи свой ник</h2>
-        <input id="username-input" type="text" placeholder="Твой ник">
-        <button onclick="setUsername()">Войти в чат</button>
-        <div id="username-error"></div>
-        <div id="password-container" class="hidden">
-            <h3>Введи пароль для Admin</h3>
-            <input id="password-input" type="password" placeholder="Пароль">
-            <button onclick="submitAdminPassword()">Подтвердить</button>
-            <div id="password-error"></div>
-        </div>
+    <div class="auth-container">
+        <h2>Вход / Регистрация</h2>
+        <input id="nickname-input" type="text" placeholder="Твой ник">
+        <input id="password-input" type="password" placeholder="Пароль">
+        <button onclick="register()">Зарегистрироваться</button>
+        <button onclick="login()">Войти</button>
+        <div id="auth-error"></div>
     </div>
     <div class="chat-room hidden">
         <div class="chat-container">
@@ -431,41 +416,37 @@
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
         const emojiPicker = document.getElementById("emoji-picker");
-        const usernameInput = document.getElementById("username-input");
-        const chatRoom = document.querySelector(".chat-room");
-        const usernameContainer = document.querySelector(".username-container");
-        const usernameError = document.getElementById("username-error");
-        const usersList = document.getElementById("users-list");
-        const passwordContainer = document.getElementById("password-container");
+        const nicknameInput = document.getElementById("nickname-input");
         const passwordInput = document.getElementById("password-input");
-        const passwordError = document.getElementById("password-error");
+        const chatRoom = document.querySelector(".chat-room");
+        const authContainer = document.querySelector(".auth-container");
+        const authError = document.getElementById("auth-error");
+        const usersList = document.getElementById("users-list");
         const adminControls = document.getElementById("admin-controls");
 
-        function setUsername() {
-            username = usernameInput.value.trim();
-            if (username) {
-                if (username.toLowerCase() === "admin") {
-                    passwordContainer.style.display = "block";
-                    passwordContainer.style.top = `${usernameInput.offsetTop + 50}px`;
-                    passwordContainer.style.left = `${usernameInput.offsetLeft}px`;
-                    passwordInput.focus();
-                } else {
-                    socket.emit("set username", { username });
-                }
+        function register() {
+            const nickname = nicknameInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (nickname && password) {
+                socket.emit("register", { nickname, password });
             } else {
-                usernameError.innerText = "Никнейм не может быть пустым";
+                authError.innerText = "Ник и пароль обязательны";
             }
         }
 
-        function submitAdminPassword() {
-            const password = passwordInput.value;
-            socket.emit("set username", { username, password });
-            passwordInput.value = "";
+        function login() {
+            const nickname = nicknameInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (nickname && password) {
+                socket.emit("login", { nickname, password });
+            } else {
+                authError.innerText = "Ник и пароль обязательны";
+            }
         }
 
-        socket.on("username set", (setUsername) => {
+        socket.on("auth success", (setUsername) => {
             username = setUsername;
-            usernameContainer.classList.add("hidden");
+            authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
             if (username.toLowerCase() === "admin") {
                 adminControls.classList.remove("hidden");
@@ -473,12 +454,8 @@
             joinRoom();
         });
 
-        socket.on("username error", (message) => {
-            usernameError.innerText = message;
-        });
-
-        socket.on("admin password required", () => {
-            passwordError.innerText = "Неверный пароль для Admin";
+        socket.on("auth error", (message) => {
+            authError.innerText = message;
         });
 
         socket.on("muted", (message) => {
