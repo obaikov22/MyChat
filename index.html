@@ -105,6 +105,7 @@
             scrollbar-width: thin;
             scrollbar-color: var(--scrollbar-thumb) var(--messages-bg);
             transition: background 0.5s ease;
+            position: relative;
         }
         #messages::-webkit-scrollbar {
             width: 8px;
@@ -157,7 +158,7 @@
             border: none;
             border-radius: 25px;
             background: var(--auth-input-bg);
-            margin-bottom: 0; /* Убрано для top-bar */
+            margin-bottom: 0;
             width: 150px;
             cursor: pointer;
             color: var(--text-color);
@@ -280,6 +281,48 @@
             gap: 10px;
             position: relative;
         }
+        #new-messages-count {
+            display: none;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: #A77BCA;
+            color: #FFFFFF;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 600;
+        }
+        #new-messages-divider {
+            display: none;
+            margin: 10px 0;
+            text-align: center;
+            position: relative;
+        }
+        #new-messages-divider::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: #4A90E2;
+            z-index: 1;
+        }
+        #new-messages-divider span {
+            background: var(--messages-bg);
+            color: #FFFFFF;
+            padding: 2px 10px;
+            position: relative;
+            z-index: 2;
+            font-size: 12px;
+            border-radius: 10px;
+            background: #4A90E2;
+        }
         .hidden {
             display: none;
         }
@@ -298,7 +341,7 @@
             transition: background 0.5s ease, box-shadow 0.5s ease;
         }
         #close-users-btn {
-            display: none; /* Скрыто на ПК */
+            display: none;
         }
         .users-panel h3 {
             margin: 0 0 15px 0;
@@ -665,8 +708,8 @@
             }
             .chat-container {
                 width: 100%;
-                padding-top: 50px; /* Отступ под фиксированную top-bar */
-                padding-bottom: 60px; /* Отступ под фиксированный input */
+                padding-top: 50px;
+                padding-bottom: 60px;
             }
             .top-bar {
                 position: fixed;
@@ -709,7 +752,7 @@
                 padding: 6px 12px;
             }
             #messages {
-                height: calc(100vh - 110px); /* Учитываем top-bar и input */
+                height: calc(100vh - 110px);
                 margin-bottom: 5px;
                 padding: 10px;
             }
@@ -724,6 +767,10 @@
                 gap: 5px;
                 z-index: 500;
                 box-shadow: 0 -2px 10px var(--shadow-color);
+            }
+            #new-messages-count {
+                bottom: 50px; /* Над input-container */
+                right: 15px;
             }
             #message-input {
                 width: 100%;
@@ -849,7 +896,9 @@
                 </select>
                 <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">👤</button>
             </div>
-            <div id="messages"></div>
+            <div id="messages">
+                <div id="new-messages-divider"><span>Новые сообщения</span></div>
+            </div>
             <div class="input-container">
                 <input id="message-input" type="text" placeholder="Напиши сообщение...">
                 <button id="emoji-button">😊</button>
@@ -858,6 +907,7 @@
                 <button onclick="sendMessage()">➤</button>
                 <button id="cancel-reply-btn" class="hidden" onclick="cancelReply()">✖</button>
                 <div id="upload-progress"><div id="upload-progress-bar"></div></div>
+                <div id="new-messages-count">0</div>
             </div>
             <div id="typing-status"></div>
             <emoji-picker id="emoji-picker"></emoji-picker>
@@ -961,8 +1011,14 @@
         const uploadProgress = document.getElementById("upload-progress");
         const uploadProgressBar = document.getElementById("upload-progress-bar");
         const notification = document.getElementById("notification");
+        const messagesContainer = document.getElementById("messages");
+        const newMessagesCount = document.getElementById("new-messages-count");
+        const newMessagesDivider = document.getElementById("new-messages-divider");
 
         let currentFile = null;
+        let newMessages = 0;
+        let lastReadMessageId = null;
+        let titleBlinkInterval = null;
 
         socket.off("chat message");
         socket.off("chat history");
@@ -987,6 +1043,39 @@
 
         function toggleUsersPanel() {
             usersPanel.classList.toggle("active");
+        }
+
+        function startTitleBlink() {
+            if (!titleBlinkInterval) {
+                titleBlinkInterval = setInterval(() => {
+                    document.title = document.title === "Мой чат" ? "Новое сообщение" : "Мой чат";
+                }, 1500);
+            }
+        }
+
+        function stopTitleBlink() {
+            if (titleBlinkInterval) {
+                clearInterval(titleBlinkInterval);
+                titleBlinkInterval = null;
+                document.title = "Мой чат";
+            }
+        }
+
+        function showNewMessagesDivider(lastReadId, firstNewId) {
+            const lastReadMessage = document.querySelector(`[data-message-id="${lastReadId}"]`);
+            const firstNewMessage = document.querySelector(`[data-message-id="${firstNewId}"]`);
+            if (lastReadMessage && firstNewMessage) {
+                messagesContainer.insertBefore(newMessagesDivider, firstNewMessage);
+                newMessagesDivider.style.display = "block";
+                setTimeout(() => {
+                    newMessagesDivider.style.transition = "opacity 0.5s ease";
+                    newMessagesDivider.style.opacity = "0";
+                    setTimeout(() => {
+                        newMessagesDivider.style.display = "none";
+                        newMessagesDivider.style.opacity = "1";
+                    }, 500);
+                }, 3000);
+            }
         }
 
         const token = localStorage.getItem("chatToken");
@@ -1045,6 +1134,10 @@
             socket.emit("join room", currentRoom);
             document.getElementById("messages").innerHTML = "";
             usersPanel.classList.remove("active");
+            newMessages = 0;
+            newMessagesCount.style.display = "none";
+            stopTitleBlink();
+            lastReadMessageId = null;
         }
 
         function logout() {
@@ -1059,6 +1152,7 @@
             authError.innerText = "";
             clearChatBtn.classList.add("hidden");
             socket.connect();
+            stopTitleBlink();
         }
 
         function compressImage(file) {
@@ -1310,21 +1404,75 @@
                 messages.innerHTML += renderMessage(message);
             });
             messages.scrollTop = messages.scrollHeight;
+            lastReadMessageId = history.length > 0 ? history[history.length - 1].messageId : null;
         });
 
         socket.on("chat message", (messageData) => {
             let messages = document.getElementById("messages");
             if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
+                const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
+                const isFocused = !document.hidden;
+
                 messages.innerHTML += renderMessage(messageData);
-                messages.scrollTop = messages.scrollHeight;
+                if (isAtBottom && isFocused) {
+                    messages.scrollTop = messages.scrollHeight;
+                    lastReadMessageId = messageData.messageId;
+                } else {
+                    newMessages++;
+                    newMessagesCount.textContent = newMessages;
+                    newMessagesCount.style.display = "block";
+                    if (!isFocused) {
+                        startTitleBlink();
+                    }
+                    if (lastReadMessageId && !newMessagesDivider.style.display) {
+                        showNewMessagesDivider(lastReadMessageId, messageData.messageId);
+                    }
+                }
             }
         });
 
         socket.on("announcement", (messageData) => {
             let messages = document.getElementById("messages");
             if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
+                const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
+                const isFocused = !document.hidden;
+
                 messages.innerHTML += renderMessage(messageData);
-                messages.scrollTop = messages.scrollHeight;
+                if (isAtBottom && isFocused) {
+                    messages.scrollTop = messages.scrollHeight;
+                    lastReadMessageId = messageData.messageId;
+                } else {
+                    newMessages++;
+                    newMessagesCount.textContent = newMessages;
+                    newMessagesCount.style.display = "block";
+                    if (!isFocused) {
+                        startTitleBlink();
+                    }
+                    if (lastReadMessageId && !newMessagesDivider.style.display) {
+                        showNewMessagesDivider(lastReadMessageId, messageData.messageId);
+                    }
+                }
+            }
+        });
+
+        messagesContainer.addEventListener("scroll", () => {
+            const isAtBottom = messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 10;
+            if (isAtBottom && newMessages > 0) {
+                newMessages = 0;
+                newMessagesCount.style.display = "none";
+                lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
+                stopTitleBlink();
+            }
+        });
+
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                stopTitleBlink();
+                if (messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 10) {
+                    newMessages = 0;
+                    newMessagesCount.style.display = "none";
+                    lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
+                }
             }
         });
 
@@ -1335,6 +1483,10 @@
 
         socket.on("chat cleared", () => {
             document.getElementById("messages").innerHTML = "";
+            newMessages = 0;
+            newMessagesCount.style.display = "none";
+            lastReadMessageId = null;
+            stopTitleBlink();
         });
 
         socket.on("user muted", ({ username, duration }) => {
