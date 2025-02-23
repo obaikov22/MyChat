@@ -207,6 +207,7 @@ io.on("connection", (socket) => {
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
                 users: allUsers, 
+                onlineUsers: onlineUsers, // Отправляем точный список онлайн-пользователей
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
@@ -231,6 +232,7 @@ io.on("connection", (socket) => {
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
                 users: allUsers, 
+                onlineUsers: onlineUsers, // Отправляем точный список онлайн-пользователей
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
@@ -387,6 +389,7 @@ io.on("connection", (socket) => {
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
                 users: allUsers, 
+                onlineUsers: onlineUsers, // Отправляем точный список онлайн-пользователей
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
