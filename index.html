@@ -320,7 +320,7 @@
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(155, 89, 182, 0.2);
         }
-        .modal, .image-modal {
+        .modal, .image-modal, .preview-modal {
             display: none;
             position: fixed;
             top: 0;
@@ -352,7 +352,7 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
-        .modal-content, .image-modal-content {
+        .modal-content, .image-modal-content, .preview-modal-content {
             background: #FFFFFF;
             padding: 20px;
             border-radius: 20px;
@@ -363,7 +363,7 @@
             transform: translateY(-20px);
             animation: slideIn 0.3s ease forwards;
         }
-        .image-modal-content {
+        .image-modal-content, .preview-modal-content {
             width: auto;
             max-width: 90%;
             max-height: 90vh;
@@ -384,11 +384,25 @@
         .modal-content img:hover {
             transform: scale(1.05);
         }
-        .image-modal-content img {
+        .image-modal-content img, .preview-modal-content img {
             max-width: 100%;
             max-height: 80vh;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(155, 89, 182, 0.2);
+        }
+        .preview-modal-content video {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(155, 89, 182, 0.2);
+        }
+        .preview-buttons {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .preview-buttons button {
+            width: 48%;
         }
         .profile-header {
             display: flex;
@@ -596,11 +610,11 @@
                 width: calc(100% - 20px);
                 max-height: 50vh;
             }
-            .modal, .image-modal {
+            .modal, .image-modal, .preview-modal {
                 align-items: flex-start;
                 padding-top: 20px;
             }
-            .modal-content, .image-modal-content {
+            .modal-content, .image-modal-content, .preview-modal-content {
                 width: 100%;
                 max-width: 100%;
                 height: calc(100vh - 40px);
@@ -613,7 +627,7 @@
                 width: 80px;
                 height: 80px;
             }
-            .image-modal-content img {
+            .image-modal-content img, .preview-modal-content img, .preview-modal-content video {
                 max-width: 100%;
                 max-height: calc(100vh - 80px);
             }
@@ -711,6 +725,16 @@
             <img id="full-image" src="" alt="Full-size image">
         </div>
     </div>
+    <div id="preview-modal" class="preview-modal">
+        <div class="preview-modal-content">
+            <button class="close-btn" onclick="closePreviewModal()">✖</button>
+            <div id="preview-content"></div>
+            <div class="preview-buttons">
+                <button onclick="confirmSendMedia()">Отправить</button>
+                <button style="background: #EF5350;" onclick="closePreviewModal()">Отмена</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/emoji-picker/index.js" type="module"></script>
@@ -721,7 +745,7 @@
         let replyingTo = null;
         let userPermissions = {};
         const userGroups = new Map();
-        const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57"; // Замени на свой ключ
+        const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57";
 
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
@@ -738,10 +762,14 @@
         const adminControls = document.getElementById("admin-controls");
         const profileModal = document.getElementById("profile-modal");
         const imageModal = document.getElementById("image-modal");
+        const previewModal = document.getElementById("preview-modal");
+        const previewContent = document.getElementById("preview-content");
         const fullImage = document.getElementById("full-image");
         const cancelReplyBtn = document.getElementById("cancel-reply-btn");
         const uploadProgress = document.getElementById("upload-progress");
         const uploadProgressBar = document.getElementById("upload-progress-bar");
+
+        let currentFile = null;
 
         socket.off("chat message");
         socket.off("chat history");
@@ -842,39 +870,68 @@
             });
         }
 
-        async function sendMessage() {
+        function showPreview(file) {
+            currentFile = file;
+            const fileUrl = URL.createObjectURL(file);
+            previewContent.innerHTML = "";
+            if (file.type.startsWith("image/")) {
+                const img = document.createElement("img");
+                img.src = fileUrl;
+                previewContent.appendChild(img);
+            } else if (file.type.startsWith("video/")) {
+                const video = document.createElement("video");
+                video.src = fileUrl;
+                video.controls = true;
+                previewContent.appendChild(video);
+            }
+            previewModal.style.display = "flex";
+        }
+
+        function closePreviewModal() {
+            previewModal.style.display = "none";
+            URL.revokeObjectURL(previewContent.querySelector("img, video")?.src);
+            previewContent.innerHTML = "";
+            currentFile = null;
+            fileInput.value = "";
+        }
+
+        async function confirmSendMedia() {
+            if (!currentFile) return;
+            const fileSizeKB = currentFile.size / 1024;
+            console.log(`Загружаю файл: ${currentFile.name}, размер: ${fileSizeKB.toFixed(2)} КБ`);
+            try {
+                const mediaUrl = await uploadToImgBB(currentFile);
+                if (mediaUrl) {
+                    socket.emit("chat message", { 
+                        room: currentRoom, 
+                        msg: messageInput.value.trim(), 
+                        replyTo: replyingTo, 
+                        media: mediaUrl 
+                    });
+                    messageInput.value = "";
+                    replyingTo = null;
+                    messageInput.placeholder = "Напиши сообщение...";
+                    cancelReplyBtn.classList.add("hidden");
+                }
+            } catch (error) {
+                console.error("Ошибка в confirmSendMedia:", error);
+                alert("Не удалось загрузить изображение");
+            }
+            closePreviewModal();
+        }
+
+        function sendMessage() {
             const msg = messageInput.value.trim();
             const file = fileInput.files[0];
             if (!msg && !file) return;
 
             if (file) {
-                const fileSizeKB = file.size / 1024;
-                console.log(`Загружаю файл: ${file.name}, размер: ${fileSizeKB.toFixed(2)} КБ`);
                 if (file.size > 10 * 1024 * 1024) { // 10 MB
                     alert("Файл слишком большой (макс. 10 МБ)");
                     fileInput.value = "";
                     return;
                 }
-                try {
-                    const mediaUrl = await uploadToImgBB(file);
-                    if (mediaUrl) {
-                        socket.emit("chat message", { 
-                            room: currentRoom, 
-                            msg, 
-                            replyTo: replyingTo, 
-                            media: mediaUrl 
-                        });
-                        messageInput.value = "";
-                        fileInput.value = "";
-                        replyingTo = null;
-                        messageInput.placeholder = "Напиши сообщение...";
-                        cancelReplyBtn.classList.add("hidden");
-                    }
-                } catch (error) {
-                    console.error("Ошибка в sendMessage:", error);
-                    alert("Не удалось загрузить изображение");
-                    fileInput.value = "";
-                }
+                showPreview(file);
             } else {
                 socket.emit("chat message", { 
                     room: currentRoom, 
@@ -1134,25 +1191,7 @@
                         alert("Изображение слишком большое (макс. 10 МБ)");
                         return;
                     }
-                    try {
-                        const mediaUrl = await uploadToImgBB(blob);
-                        if (mediaUrl) {
-                            console.log("Изображение из буфера загружено, отправляю URL");
-                            socket.emit("chat message", { 
-                                room: currentRoom, 
-                                msg: messageInput.value.trim(), 
-                                replyTo: replyingTo, 
-                                media: mediaUrl 
-                            });
-                            messageInput.value = "";
-                            replyingTo = null;
-                            messageInput.placeholder = "Напиши сообщение...";
-                            cancelReplyBtn.classList.add("hidden");
-                        }
-                    } catch (error) {
-                        console.error("Ошибка в paste:", error);
-                        alert("Не удалось загрузить изображение");
-                    }
+                    showPreview(blob);
                     event.preventDefault();
                     break;
                 }
