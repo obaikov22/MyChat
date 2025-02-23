@@ -1253,9 +1253,13 @@
         }
 
         socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, groups, isOwnProfile, canAssignGroups }) => {
+            if (!nickname) {
+                showNotification("Профиль не найден");
+                return;
+            }
             userGroups.set(nickname.toLowerCase(), groups || []);
             document.getElementById("profile-nickname").textContent = nickname;
-            document.getElementById("profile-avatar").src = avatar;
+            document.getElementById("profile-avatar").src = avatar || "default-avatar.png";
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
             const statusEl = document.getElementById("profile-status");
             const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));

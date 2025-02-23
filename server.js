@@ -33,10 +33,10 @@ async function saveUser(nickname, password) {
         const hashedPassword = await bcrypt.hash(password, 10);
         const defaultAvatar = "default-avatar.png";
         await pool.query(`
-            INSERT INTO users (nickname, password, avatar)
-            VALUES ($1, $2, $3)
+            INSERT INTO users (nickname, password, avatar, groups)
+            VALUES ($1, $2, $3, $4)
             ON CONFLICT (nickname) DO NOTHING`, 
-            [nickname, hashedPassword, defaultAvatar]);
+            [nickname, hashedPassword, defaultAvatar, nickname.toLowerCase() === "admin" ? ['Администратор'] : []]);
     } catch (err) {
         console.error("Ошибка сохранения пользователя:", err.message);
     }
@@ -94,12 +94,15 @@ async function getUserPermissions(username) {
     try {
         const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [username]);
         if (res.rows.length > 0) {
+            const user = res.rows[0];
+            const isAdmin = (user.groups || []).includes('Администратор');
+            const isModerator = (user.groups || []).includes('Модератор');
             return {
-                deleteMessages: res.rows[0].delete_messages || false,
-                muteUsers: res.rows[0].mute_users || false,
-                banUsers: res.rows[0].ban_users || false,
-                clearChat: res.rows[0].clear_chat || false,
-                assignGroups: res.rows[0].assign_groups || false
+                deleteMessages: isAdmin || isModerator || user.delete_messages || false,
+                muteUsers: isAdmin || isModerator || user.mute_users || false,
+                banUsers: isAdmin || user.ban_users || false,
+                clearChat: isAdmin || user.clear_chat || false,
+                assignGroups: isAdmin || user.assign_groups || false
             };
         }
         return { deleteMessages: false, muteUsers: false, banUsers: false, clearChat: false, assignGroups: false };
@@ -124,7 +127,6 @@ async function getUserProfile(username) {
         const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [username]);
         if (res.rows.length > 0) {
             const user = res.rows[0];
-            const groupsRes = await pool.query('SELECT group_name FROM user_groups WHERE nickname = $1', [username]);
             return {
                 nickname: user.nickname,
                 avatar: user.avatar,
@@ -132,7 +134,7 @@ async function getUserProfile(username) {
                 last_seen: user.last_seen,
                 bio: user.bio,
                 achievements: user.achievements || [],
-                groups: groupsRes.rows.map(row => row.group_name)
+                groups: user.groups || []
             };
         }
         return null;
@@ -160,10 +162,10 @@ async function updateUserProfile(username, { avatar, age, bio }) {
 async function assignGroup(targetUsername, groupName) {
     try {
         await pool.query(`
-            INSERT INTO user_groups (nickname, group_name)
-            VALUES ($1, $2)
-            ON CONFLICT (nickname, group_name) DO NOTHING`, 
-            [targetUsername, groupName]);
+            UPDATE users 
+            SET groups = array_append(groups, $1)
+            WHERE nickname = $2 AND NOT ($1 = ANY(groups))`, 
+            [groupName, targetUsername]);
         if (groupName.toLowerCase() === "администратор") {
             await pool.query(`
                 UPDATE users
@@ -194,7 +196,7 @@ io.on("connection", (socket) => {
         if (isValid) {
             const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: '1h' });
             users.set(socket.id, nickname);
-            const permissions = await getUserPermissions(nickname); // Исправлено: передаём nickname
+            const permissions = await getUserPermissions(nickname);
             socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
@@ -213,7 +215,7 @@ io.on("connection", (socket) => {
             const decoded = jwt.verify(token, JWT_SECRET);
             const nickname = decoded.nickname;
             users.set(socket.id, nickname);
-            const permissions = await getUserPermissions(nickname); // Исправлено: передаём nickname
+            const permissions = await getUserPermissions(nickname);
             socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
@@ -344,6 +346,8 @@ io.on("connection", (socket) => {
                 isOwnProfile: username === targetUsername, 
                 canAssignGroups: permissions.assignGroups 
             });
+        } else {
+            socket.emit("profile data", null);
         }
     });
 
