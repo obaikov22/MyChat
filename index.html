@@ -3,6 +3,7 @@
 <head>
     <title>Мой чат</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
     <style>
         body {
             background: linear-gradient(135deg, #E8DAEF, #F5F5F5);
@@ -734,14 +735,14 @@
             </div>
             <div id="group-form" class="group-form">
                 <select id="group-select">
-                    <option value="">Выберите группу</option>
-                    <option value="Администратор">Администратор</option>
-                    <option value="Модератор">Модератор</option>
+                    <option value="">Выберите роль</option>
+                    <option value="admin">Администратор</option>
+                    <option value="moderator">Модератор</option>
                 </select>
                 <button onclick="assignGroup()">Назначить</button>
                 <button onclick="cancelGroupForm()">Отмена</button>
             </div>
-            <button id="assign-group-btn" class="admin-btn hidden" onclick="showGroupForm()">Назначить группу</button>
+            <button id="assign-group-btn" class="admin-btn hidden" onclick="showGroupForm()">Назначить роль</button>
         </div>
     </div>
     <div id="image-modal" class="image-modal">
@@ -771,7 +772,6 @@
         let username = "";
         let replyingTo = null;
         let userPermissions = {};
-        const userGroups = new Map();
         const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57";
 
         const messageInput = document.getElementById("message-input");
@@ -1252,12 +1252,11 @@
             socket.emit("get profile", targetUsername);
         }
 
-        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, groups, isOwnProfile, canAssignGroups }) => {
+        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, role, isOwnProfile, canAssignGroups }) => {
             if (!nickname) {
                 showNotification("Профиль не найден");
                 return;
             }
-            userGroups.set(nickname.toLowerCase(), groups || []);
             document.getElementById("profile-nickname").textContent = nickname;
             document.getElementById("profile-avatar").src = avatar || "default-avatar.png";
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
@@ -1273,21 +1272,19 @@
                 span.textContent = ach;
                 achievementsEl.appendChild(span);
             });
-            if (groups && groups.length > 0) {
-                groups.forEach(group => {
-                    const span = document.createElement("span");
-                    span.className = "achievement";
-                    span.textContent = group;
-                    span.style = `
-                        background: linear-gradient(135deg, #E8DAEF, #D1C4E9);
-                        padding: 6px 12px;
-                        border-radius: 20px;
-                        font-size: 0.85em;
-                        color: ${group.toLowerCase() === "администратор" ? "#FF0000" : group.toLowerCase() === "модератор" ? "#9B59B6" : "#FFFFFF"};
-                        font-weight: 500;
-                        box-shadow: 0 2px 5px rgba(155, 89, 182, 0.2);`
-                    achievementsEl.appendChild(span);
-                });
+            if (role && role !== 'user') {
+                const span = document.createElement("span");
+                span.className = "achievement";
+                span.textContent = role === 'admin' ? "Администратор" : "Модератор";
+                span.style = `
+                    background: linear-gradient(135deg, #E8DAEF, #D1C4E9);
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 0.85em;
+                    color: ${role === 'admin' ? "#FF0000" : "#9B59B6"};
+                    font-weight: 500;
+                    box-shadow: 0 2px 5px rgba(155, 89, 182, 0.2);`
+                achievementsEl.appendChild(span);
             }
             document.getElementById("profile-bio").textContent = bio || "Нет подписи";
             const editBtn = document.getElementById("edit-profile-btn");
@@ -1339,9 +1336,9 @@
         }
 
         function assignGroup() {
-            const groupName = document.getElementById("group-select").value;
-            if (groupName) {
-                socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, groupName });
+            const role = document.getElementById("group-select").value;
+            if (role) {
+                socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, role });
             }
             closeProfileModal();
         }

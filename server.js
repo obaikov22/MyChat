@@ -32,15 +32,15 @@ async function saveUser(nickname, password) {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const defaultAvatar = "default-avatar.png";
-        const groups = nickname.toLowerCase() === "admin" ? ['Администратор'] : [];
+        const role = nickname.toLowerCase() === "admin" ? 'admin' : 'user';
         await pool.query(`
-            INSERT INTO users (nickname, password, avatar, groups)
+            INSERT INTO users (nickname, password, avatar, role)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (nickname) DO UPDATE 
             SET password = EXCLUDED.password, 
                 avatar = COALESCE(EXCLUDED.avatar, users.avatar), 
-                groups = EXCLUDED.groups`,
-            [nickname, hashedPassword, defaultAvatar, groups]);
+                role = EXCLUDED.role`,
+            [nickname, hashedPassword, defaultAvatar, role]);
     } catch (err) {
         console.error("Ошибка сохранения пользователя:", err.message);
     }
@@ -55,10 +55,10 @@ async function verifyUser(nickname, password) {
         }
         const user = res.rows[0];
         const isValid = await bcrypt.compare(password, user.password);
-        if (isValid && nickname.toLowerCase() === "admin" && !user.groups.includes('Администратор')) {
+        if (isValid && nickname.toLowerCase() === "admin" && user.role !== 'admin') {
             await pool.query(`
                 UPDATE users 
-                SET groups = ARRAY['Администратор']
+                SET role = 'admin'
                 WHERE nickname = $1`, [nickname]);
         }
         return isValid;
@@ -103,19 +103,26 @@ async function getChatHistory(room) {
 
 async function getUserPermissions(username) {
     try {
-        const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [username]);
+        const res = await pool.query('SELECT role FROM users WHERE nickname = $1', [username]);
         if (res.rows.length > 0) {
-            const user = res.rows[0];
-            const groups = user.groups || [];
-            const isAdmin = groups.includes('Администратор');
-            const isModerator = groups.includes('Модератор');
-            return {
-                deleteMessages: isAdmin || isModerator || user.delete_messages || false,
-                muteUsers: isAdmin || isModerator || user.mute_users || false,
-                banUsers: isAdmin || user.ban_users || false,
-                clearChat: isAdmin || user.clear_chat || false,
-                assignGroups: isAdmin || user.assign_groups || false
-            };
+            const role = res.rows[0].role || 'user';
+            if (role === 'admin') {
+                return {
+                    deleteMessages: true,
+                    muteUsers: true,
+                    banUsers: true,
+                    clearChat: true,
+                    assignGroups: true
+                };
+            } else if (role === 'moderator') {
+                return {
+                    deleteMessages: true,
+                    muteUsers: true,
+                    banUsers: false,
+                    clearChat: false,
+                    assignGroups: false
+                };
+            }
         }
         return { deleteMessages: false, muteUsers: false, banUsers: false, clearChat: false, assignGroups: false };
     } catch (err) {
@@ -146,7 +153,7 @@ async function getUserProfile(username) {
                 last_seen: user.last_seen,
                 bio: user.bio,
                 achievements: user.achievements || [],
-                groups: user.groups || []
+                role: user.role || 'user'
             };
         }
         return null;
@@ -171,34 +178,15 @@ async function updateUserProfile(username, { avatar, age, bio }) {
     }
 }
 
-async function assignGroup(targetUsername, groupName) {
+async function assignRole(targetUsername, role) {
     try {
         await pool.query(`
             UPDATE users 
-            SET groups = array_append(groups, $1)
-            WHERE nickname = $2 AND NOT ($1 = ANY(groups))`, 
-            [groupName, targetUsername]);
-        if (groupName.toLowerCase() === "администратор") {
-            await pool.query(`
-                UPDATE users
-                SET delete_messages = true,
-                    mute_users = true,
-                    ban_users = true,
-                    clear_chat = true,
-                    assign_groups = true
-                WHERE nickname = $1`, [targetUsername]);
-        } else if (groupName.toLowerCase() === "модератор") {
-            await pool.query(`
-                UPDATE users
-                SET delete_messages = true,
-                    mute_users = true,
-                    ban_users = false,
-                    clear_chat = false,
-                    assign_groups = false
-                WHERE nickname = $1`, [targetUsername]);
-        }
+            SET role = $1
+            WHERE nickname = $2`, 
+            [role, targetUsername]);
     } catch (err) {
-        console.error("Ошибка назначения группы:", err.message);
+        console.error("Ошибка назначения роли:", err.message);
     }
 }
 
@@ -380,13 +368,13 @@ io.on("connection", (socket) => {
         socket.emit("profile updated", "Профиль обновлён");
     });
 
-    socket.on("assign group", async ({ targetUsername, groupName }) => {
+    socket.on("assign group", async ({ targetUsername, role }) => {
         const username = users.get(socket.id);
         if (!username) return;
         const permissions = await getUserPermissions(username);
         if (permissions.assignGroups) {
-            await assignGroup(targetUsername, groupName);
-            io.emit("group assigned", `${targetUsername} теперь ${groupName}`);
+            await assignRole(targetUsername, role.toLowerCase());
+            io.emit("group assigned", `${targetUsername} теперь ${role === 'admin' ? 'Администратор' : 'Модератор'}`);
         }
     });
 
