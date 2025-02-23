@@ -348,6 +348,25 @@
             background: #9B59B6;
             transition: width 0.3s ease;
         }
+        #notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #9B59B6;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4);
+            z-index: 2000;
+            display: none;
+            max-width: 300px;
+            word-wrap: break-word;
+            animation: slideInNotification 0.3s ease forwards;
+        }
+        @keyframes slideInNotification {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -631,6 +650,12 @@
                 max-width: 100%;
                 max-height: calc(100vh - 80px);
             }
+            #notification {
+                top: 10px;
+                right: 10px;
+                width: calc(100% - 20px);
+                max-width: 90%;
+            }
             .profile-info h4 {
                 font-size: 1.3em;
             }
@@ -735,6 +760,7 @@
             </div>
         </div>
     </div>
+    <div id="notification"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.2.1/compressor.min.js"></script>
@@ -747,7 +773,7 @@
         let userPermissions = {};
         const userGroups = new Map();
         const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57";
-    
+
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
         const attachButton = document.getElementById("attach-button");
@@ -769,24 +795,33 @@
         const cancelReplyBtn = document.getElementById("cancel-reply-btn");
         const uploadProgress = document.getElementById("upload-progress");
         const uploadProgressBar = document.getElementById("upload-progress-bar");
-    
+        const notification = document.getElementById("notification");
+
         let currentFile = null;
-    
+
         socket.off("chat message");
         socket.off("chat history");
         socket.off("update users");
-    
+
         const token = localStorage.getItem("chatToken");
         if (token) {
             socket.emit("auto login", token);
         }
-    
+
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.style.display = "block";
+            setTimeout(() => {
+                notification.style.display = "none";
+            }, 3000);
+        }
+
         passwordInput.addEventListener("keypress", function(event) {
             if (event.key === "Enter") {
                 auth();
             }
         });
-    
+
         function auth() { 
             const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
@@ -796,7 +831,7 @@
                 authError.innerText = "Ник и пароль обязательны";
             }
         }
-    
+
         socket.on("auth success", ({ nickname, token, permissions }) => {
             username = nickname;
             userPermissions = permissions;
@@ -808,22 +843,23 @@
             }
             joinRoom();
         });
-    
+
         socket.on("auth error", (message) => {
             authError.innerText = message;
+            showNotification(message);
             localStorage.removeItem("chatToken");
         });
-    
+
         socket.on("muted", (message) => {
-            alert(message);
+            showNotification(message);
         });
-    
+
         function joinRoom() {
             currentRoom = document.getElementById("room-select").value;
             socket.emit("join room", currentRoom);
             document.getElementById("messages").innerHTML = "";
         }
-    
+
         function compressImage(file) {
             return new Promise((resolve, reject) => {
                 new Compressor(file, {
@@ -841,21 +877,21 @@
                 });
             });
         }
-    
+
         async function uploadToImgBB(file) {
             let fileToUpload = file;
             if (file.type.startsWith("image/")) {
                 fileToUpload = await compressImage(file);
             }
-    
+
             return new Promise((resolve, reject) => {
                 const formData = new FormData();
                 formData.append("image", fileToUpload);
                 formData.append("key", IMGBB_API_KEY);
-    
+
                 const xhr = new XMLHttpRequest();
                 xhr.open("POST", "https://api.imgbb.com/1/upload", true);
-    
+
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
                         const percent = (event.loaded / event.total) * 100;
@@ -863,7 +899,7 @@
                         uploadProgress.style.display = "block";
                     }
                 };
-    
+
                 xhr.onload = () => {
                     uploadProgress.style.display = "none";
                     uploadProgressBar.style.width = "0%";
@@ -878,17 +914,17 @@
                         reject(new Error("Ошибка загрузки: " + xhr.status));
                     }
                 };
-    
+
                 xhr.onerror = () => {
                     uploadProgress.style.display = "none";
                     uploadProgressBar.style.width = "0%";
                     reject(new Error("Ошибка сети при загрузке"));
                 };
-    
+
                 xhr.send(formData);
             });
         }
-    
+
         function showPreview(file) {
             currentFile = file;
             const fileUrl = URL.createObjectURL(file);
@@ -905,7 +941,7 @@
             }
             previewModal.style.display = "flex";
         }
-    
+
         function closePreviewModal() {
             previewModal.style.display = "none";
             URL.revokeObjectURL(previewContent.querySelector("img, video")?.src);
@@ -913,7 +949,7 @@
             currentFile = null;
             fileInput.value = "";
         }
-    
+
         async function confirmSendMedia() {
             if (!currentFile) return;
             try {
@@ -932,19 +968,19 @@
                 }
             } catch (error) {
                 console.error("Ошибка в confirmSendMedia:", error);
-                alert("Не удалось загрузить изображение");
+                showNotification("Не удалось загрузить изображение");
             }
             closePreviewModal();
         }
-    
+
         function sendMessage() {
             const msg = messageInput.value.trim();
             const file = fileInput.files[0];
             if (!msg && !file) return;
-    
+
             if (file) {
                 if (file.size > 10 * 1024 * 1024) {
-                    alert("Файл слишком большой (макс. 10 МБ)");
+                    showNotification("Файл слишком большой (макс. 10 МБ)");
                     fileInput.value = "";
                     return;
                 }
@@ -961,7 +997,7 @@
                 cancelReplyBtn.classList.add("hidden");
             }
         }
-    
+
         function replyToMessage(messageId) {
             replyingTo = messageId;
             const repliedMessage = document.querySelector(`[data-message-id="${messageId}"] p`).textContent;
@@ -969,30 +1005,30 @@
             messageInput.focus();
             cancelReplyBtn.classList.remove("hidden");
         }
-    
+
         function cancelReply() {
             replyingTo = null;
             messageInput.placeholder = "Напиши сообщение...";
             cancelReplyBtn.classList.add("hidden");
         }
-    
+
         function scrollToMessage(messageId) {
             const message = document.querySelector(`[data-message-id="${messageId}"]`);
             if (message) {
                 message.scrollIntoView({ behavior: "smooth", block: "center" });
             }
         }
-    
+
         function deleteMessage(messageId) {
             socket.emit("delete message", { room: currentRoom, messageId });
         }
-    
+
         function clearChat() {
             if (confirm("Очистить чат?")) {
                 socket.emit("clear chat", currentRoom);
             }
         }
-    
+
         function muteUser(targetUsername) {
             if (username === targetUsername) {
                 return;
@@ -1002,7 +1038,7 @@
                 socket.emit("mute user", { room: currentRoom, targetUsername, duration: parseInt(duration) });
             }
         }
-    
+
         function banUser(targetUsername) {
             if (username === targetUsername) {
                 return;
@@ -1011,17 +1047,17 @@
                 socket.emit("ban user", { room: currentRoom, targetUsername });
             }
         }
-    
+
         function showImageModal(src) {
             fullImage.src = src;
             imageModal.style.display = "flex";
         }
-    
+
         function closeImageModal() {
             imageModal.style.display = "none";
             fullImage.src = "";
         }
-    
+
         function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media }) {
             const isAdmin = msgUsername.toLowerCase() === "admin";
             const replyContent = replyTo ? `
@@ -1065,7 +1101,7 @@
                 </div>
             `;
         }
-    
+
         socket.on("chat history", (history) => {
             let messages = document.getElementById("messages");
             messages.innerHTML = "";
@@ -1074,7 +1110,7 @@
             });
             messages.scrollTop = messages.scrollHeight;
         });
-    
+
         socket.on("chat message", (messageData) => {
             let messages = document.getElementById("messages");
             if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
@@ -1082,7 +1118,7 @@
                 messages.scrollTop = messages.scrollHeight;
             }
         });
-    
+
         socket.on("announcement", (messageData) => {
             let messages = document.getElementById("messages");
             if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
@@ -1090,24 +1126,24 @@
                 messages.scrollTop = messages.scrollHeight;
             }
         });
-    
+
         socket.on("message deleted", (messageId) => {
             const message = document.querySelector(`[data-message-id="${messageId}"]`);
             if (message) message.remove();
         });
-    
+
         socket.on("chat cleared", () => {
             document.getElementById("messages").innerHTML = "";
         });
-    
+
         socket.on("user muted", ({ username, duration }) => {
-            alert(`${username} замучен на ${duration} секунд`);
+            showNotification(`${username} замучен на ${duration} секунд`);
         });
-    
+
         socket.on("user banned", (username) => {
-            alert(`${username} забанен`);
+            showNotification(`${username} забанен`);
         });
-    
+
         socket.on("update users", ({ users, onlineCount, totalCount }) => {
             usersList.innerHTML = "";
             const onlineUsers = users.slice(0, onlineCount);
@@ -1144,7 +1180,7 @@
             });
             userCount.innerText = `${onlineCount}/${totalCount}`;
         });
-    
+
         let typingTimeout;
         messageInput.addEventListener("input", () => {
             socket.emit("typing", currentRoom);
@@ -1153,21 +1189,21 @@
                 socket.emit("stop typing", currentRoom);
             }, 1000);
         });
-    
+
         socket.on("typing", (username) => {
             document.getElementById("typing-status").textContent = `${username} пишет...`;
         });
-    
+
         socket.on("stop typing", () => {
             document.getElementById("typing-status").textContent = "";
         });
-    
+
         messageInput.addEventListener("keypress", function(event) {
             if (event.key === "Enter") {
                 sendMessage();
             }
         });
-    
+
         emojiButton.addEventListener("click", () => {
             const isVisible = emojiPicker.style.display === "block";
             emojiPicker.style.display = isVisible ? "none" : "block";
@@ -1179,30 +1215,30 @@
                 emojiPicker.style.left = `${messageInput.offsetLeft}px`;
             }
         });
-    
+
         emojiPicker.addEventListener("emoji-click", (event) => {
             messageInput.value += event.detail.unicode;
             emojiPicker.style.display = "none";
             messageInput.focus();
         });
-    
+
         attachButton.addEventListener("click", () => {
             fileInput.click();
         });
-    
+
         fileInput.addEventListener("change", () => {
             if (fileInput.files.length > 0) {
                 sendMessage();
             }
         });
-    
+
         messageInput.addEventListener("paste", async (event) => {
             const items = (event.clipboardData || event.originalEvent.clipboardData).items;
             for (const item of items) {
                 if (item.type.indexOf("image") === 0) {
                     const blob = item.getAsFile();
                     if (blob.size > 10 * 1024 * 1024) {
-                        alert("Изображение слишком большое (макс. 10 МБ)");
+                        showNotification("Изображение слишком большое (макс. 10 МБ)");
                         return;
                     }
                     showPreview(blob);
@@ -1211,11 +1247,11 @@
                 }
             }
         });
-    
+
         function showProfile(targetUsername) {
             socket.emit("get profile", targetUsername);
         }
-    
+
         socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, groups, isOwnProfile, canAssignGroups }) => {
             userGroups.set(nickname.toLowerCase(), groups || []);
             document.getElementById("profile-nickname").textContent = nickname;
@@ -1256,24 +1292,24 @@
             assignBtn.style.display = canAssignGroups ? "block" : "none";
             profileModal.style.display = "flex";
         });
-    
+
         function closeProfileModal() {
             profileModal.style.display = "none";
             document.getElementById("edit-form").style.display = "none";
             document.getElementById("group-form").style.display = "none";
         }
-    
+
         function showEditForm() {
             document.getElementById("edit-form").style.display = "block";
             document.getElementById("edit-age").value = document.getElementById("profile-age").textContent.replace("Возраст: ", "") || "";
             document.getElementById("edit-bio").value = document.getElementById("profile-bio").textContent === "Нет подписи" ? "" : document.getElementById("profile-bio").textContent;
         }
-    
+
         function saveProfile() {
             const avatarFile = document.getElementById("edit-avatar").files[0];
             const age = document.getElementById("edit-age").value;
             const bio = document.getElementById("edit-bio").value;
-    
+
             if (avatarFile) {
                 const reader = new FileReader();
                 reader.onload = () => {
@@ -1285,19 +1321,19 @@
             }
             closeProfileModal();
         }
-    
+
         socket.on("profile updated", (message) => {
             showProfile(username);
         });
-    
+
         function cancelEdit() {
             document.getElementById("edit-form").style.display = "none";
         }
-    
+
         function showGroupForm() {
             document.getElementById("group-form").style.display = "block";
         }
-    
+
         function assignGroup() {
             const groupName = document.getElementById("group-select").value;
             if (groupName) {
@@ -1305,12 +1341,12 @@
             }
             closeProfileModal();
         }
-    
+
         socket.on("group assigned", (message) => {
-            alert(message);
+            showNotification(message);
             showProfile(document.getElementById("profile-nickname").textContent);
         });
-    
+
         function cancelGroupForm() {
             document.getElementById("group-form").style.display = "none";
         }
