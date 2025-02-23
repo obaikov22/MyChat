@@ -36,7 +36,10 @@ async function saveUser(nickname, password) {
         await pool.query(`
             INSERT INTO users (nickname, password, avatar, groups)
             VALUES ($1, $2, $3, $4)
-            ON CONFLICT (nickname) DO NOTHING`, 
+            ON CONFLICT (nickname) DO UPDATE 
+            SET password = EXCLUDED.password, 
+                avatar = COALESCE(EXCLUDED.avatar, users.avatar), 
+                groups = EXCLUDED.groups`,
             [nickname, hashedPassword, defaultAvatar, groups]);
     } catch (err) {
         console.error("Ошибка сохранения пользователя:", err.message);
@@ -51,7 +54,14 @@ async function verifyUser(nickname, password) {
             return true;
         }
         const user = res.rows[0];
-        return await bcrypt.compare(password, user.password);
+        const isValid = await bcrypt.compare(password, user.password);
+        if (isValid && nickname.toLowerCase() === "admin" && !user.groups.includes('Администратор')) {
+            await pool.query(`
+                UPDATE users 
+                SET groups = ARRAY['Администратор']
+                WHERE nickname = $1`, [nickname]);
+        }
+        return isValid;
     } catch (err) {
         console.error("Ошибка проверки пользователя:", err.message);
         return false;
@@ -196,7 +206,8 @@ io.on("connection", (socket) => {
     socket.on("auth", async ({ nickname, password }) => {
         const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
         if (existingSocketId) {
-            users.delete(existingSocketId); // Удаляем старую сессию
+            users.delete(existingSocketId);
+            io.sockets.sockets.get(existingSocketId)?.disconnect();
         }
         const isValid = await verifyUser(nickname, password);
         if (isValid) {
@@ -222,7 +233,8 @@ io.on("connection", (socket) => {
             const nickname = decoded.nickname;
             const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
             if (existingSocketId) {
-                users.delete(existingSocketId); // Удаляем старую сессию
+                users.delete(existingSocketId);
+                io.sockets.sockets.get(existingSocketId)?.disconnect();
             }
             users.set(socket.id, nickname);
             const permissions = await getUserPermissions(nickname);
