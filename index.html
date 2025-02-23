@@ -34,7 +34,7 @@
         }
 
         .dark-theme {
-            /* Тёмная тема (обновлённые цвета) */
+            /* Тёмная тема */
             --background-gradient: linear-gradient(135deg, #1F1727, #2A2E35);
             --chat-bg: #2E2A40;
             --messages-bg: #38324E;
@@ -343,6 +343,9 @@
         .admin-btn:hover {
             background: var(--admin-btn-hover-bg);
         }
+        #toggle-users-btn {
+            display: none; /* Скрыто на ПК */
+        }
         .delete-btn, .reply-btn {
             display: none;
             position: absolute;
@@ -645,7 +648,7 @@
             .chat-room, .auth-container {
                 flex-direction: column;
                 width: 100%;
-                padding: 15px;
+                padding: 10px;
                 border-radius: 0;
                 box-shadow: none;
                 min-height: 100vh;
@@ -656,119 +659,137 @@
             .users-panel {
                 width: 100%;
                 margin-left: 0;
-                margin-top: 15px;
+                margin-top: 10px;
                 padding: 10px;
                 border-radius: 10px;
+                position: fixed;
+                top: 0;
+                right: -100%;
+                height: 100%;
+                z-index: 1000;
+                transition: right 0.3s ease;
+            }
+            .users-panel.active {
+                right: 0;
+            }
+            #toggle-users-btn {
+                display: block;
+                margin-bottom: 10px;
+                width: auto;
             }
             #messages {
-                height: calc(100vh - 250px);
-                margin-bottom: 15px;
+                height: calc(100vh - 200px);
+                margin-bottom: 10px;
+                padding: 10px;
             }
             #message-input {
                 width: 100%;
-                padding: 12px 15px;
-                font-size: 16px;
+                padding: 8px 12px;
+                font-size: 14px;
             }
             .input-container {
                 flex-direction: row;
                 align-items: center;
                 gap: 5px;
-                padding: 10px 0;
+                padding: 5px 0;
                 background: var(--chat-bg);
+                flex-wrap: nowrap;
             }
             #emoji-button, button, #attach-button {
-                padding: 12px;
-                font-size: 18px;
-                width: auto;
-                min-width: 50px;
+                padding: 8px;
+                font-size: 16px;
+                min-width: 40px;
             }
             #cancel-reply-btn {
-                padding: 10px;
-                font-size: 14px;
+                padding: 6px 10px;
+                font-size: 12px;
             }
             #upload-progress {
                 width: 100%;
             }
             select {
                 width: 100%;
-                margin: 10px 0;
-                padding: 12px 15px;
-                font-size: 16px;
+                margin: 5px 0;
+                padding: 8px 12px;
+                font-size: 14px;
             }
             .message, .announcement {
-                max-width: 85%;
-                padding: 10px 15px;
+                max-width: 90%;
+                padding: 8px 12px;
+                font-size: 14px;
             }
             .delete-btn, .reply-btn {
-                padding: 6px 10px;
-                font-size: 14px;
+                padding: 4px 8px;
+                font-size: 12px;
             }
             .delete-btn {
                 right: 5px;
             }
             .reply-btn {
-                right: 60px;
+                right: 50px;
             }
             .auth-container h2 {
-                font-size: 1.5em;
+                font-size: 1.3em;
             }
             #nickname-input, #password-input {
                 width: 100%;
-                padding: 12px 15px;
-                font-size: 16px;
+                padding: 8px 12px;
+                font-size: 14px;
             }
             .auth-container button {
                 width: 48%;
-                padding: 12px 15px;
-                font-size: 16px;
+                padding: 8px 12px;
+                font-size: 14px;
                 margin: 5px 1%;
             }
             emoji-picker {
-                bottom: 70px;
-                left: 10px;
-                width: calc(100% - 20px);
-                max-height: 50vh;
+                bottom: 60px;
+                left: 5px;
+                width: calc(100% - 10px);
+                max-height: 40vh;
             }
             .modal, .image-modal, .preview-modal {
                 align-items: flex-start;
-                padding-top: 20px;
+                padding-top: 10px;
             }
             .modal-content, .image-modal-content, .preview-modal-content {
                 width: 100%;
                 max-width: 100%;
-                height: calc(100vh - 40px);
-                margin: 0 10px;
-                border-radius: 15px 15px 0 0;
+                height: calc(100vh - 20px);
+                margin: 0 5px;
+                border-radius: 10px 10px 0 0;
                 overflow-y: auto;
-                padding: 25px;
+                padding: 15px;
             }
             .modal-content img {
-                width: 80px;
-                height: 80px;
+                width: 60px;
+                height: 60px;
             }
             .image-modal-content img, .preview-modal-content img, .preview-modal-content video {
                 max-width: 100%;
-                max-height: calc(100vh - 80px);
+                max-height: calc(100vh - 60px);
             }
             #notification {
-                top: 10px;
-                right: 10px;
-                width: calc(100% - 20px);
+                top: 5px;
+                right: 5px;
+                width: calc(100% - 10px);
                 max-width: 90%;
+                padding: 8px 12px;
+                font-size: 14px;
             }
             .profile-info h4 {
-                font-size: 1.3em;
+                font-size: 1.2em;
             }
             .profile-info .status, .profile-info .age {
-                font-size: 0.85em;
+                font-size: 0.8em;
             }
             .edit-form input, .edit-form textarea, .group-form select {
-                font-size: 1em;
-                padding: 12px;
+                font-size: 0.9em;
+                padding: 8px;
             }
             .edit-form button, .group-form button {
-                padding: 12px;
-                font-size: 1em;
+                padding: 8px;
+                font-size: 0.9em;
             }
             .media-container img, .media-container video, .media-container audio {
                 max-width: 100%;
@@ -790,6 +811,7 @@
                 <option value="room1">Комната 1</option>
                 <option value="room2">Комната 2</option>
             </select>
+            <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">Показать пользователей</button>
             <div id="messages"></div>
             <div class="input-container">
                 <input id="message-input" type="text" placeholder="Напиши сообщение...">
@@ -890,6 +912,8 @@
         const adminControls = document.getElementById("admin-controls");
         const clearChatBtn = document.getElementById("clear-chat-btn");
         const themeToggleBtn = document.getElementById("theme-toggle-btn");
+        const toggleUsersBtn = document.getElementById("toggle-users-btn");
+        const usersPanel = document.querySelector(".users-panel");
         const profileModal = document.getElementById("profile-modal");
         const imageModal = document.getElementById("image-modal");
         const previewModal = document.getElementById("preview-modal");
@@ -921,6 +945,11 @@
                 localStorage.setItem("theme", "light");
                 themeToggleBtn.textContent = "Тёмная тема";
             }
+        }
+
+        function toggleUsersPanel() {
+            usersPanel.classList.toggle("active");
+            toggleUsersBtn.textContent = usersPanel.classList.contains("active") ? "Скрыть пользователей" : "Показать пользователей";
         }
 
         const token = localStorage.getItem("chatToken");
@@ -978,6 +1007,8 @@
             currentRoom = document.getElementById("room-select").value;
             socket.emit("join room", currentRoom);
             document.getElementById("messages").innerHTML = "";
+            usersPanel.classList.remove("active"); // Скрываем панель при смене комнаты на мобильных
+            toggleUsersBtn.textContent = "Показать пользователей";
         }
 
         function logout() {
@@ -1341,8 +1372,8 @@
             const isVisible = emojiPicker.style.display === "block";
             emojiPicker.style.display = isVisible ? "none" : "block";
             if (!isVisible && window.innerWidth <= 768) {
-                emojiPicker.style.bottom = "70px";
-                emojiPicker.style.left = "10px";
+                emojiPicker.style.bottom = "60px";
+                emojiPicker.style.left = "5px";
             } else if (!isVisible) {
                 emojiPicker.style.top = `${messageInput.offsetTop - 300}px`;
                 emojiPicker.style.left = `${messageInput.offsetLeft}px`;
