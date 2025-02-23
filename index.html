@@ -89,6 +89,12 @@
             display: flex;
             flex-direction: column;
         }
+        .top-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
         #messages {
             height: 500px;
             overflow-y: auto;
@@ -151,7 +157,7 @@
             border: none;
             border-radius: 25px;
             background: var(--auth-input-bg);
-            margin-bottom: 20px;
+            margin-bottom: 0; /* Убрано для top-bar */
             width: 150px;
             cursor: pointer;
             color: var(--text-color);
@@ -290,6 +296,9 @@
             border-radius: 10px;
             box-shadow: 0 4px 15px var(--shadow-color);
             transition: background 0.5s ease, box-shadow 0.5s ease;
+        }
+        #close-users-btn {
+            display: none; /* Скрыто на ПК */
         }
         .users-panel h3 {
             margin: 0 0 15px 0;
@@ -656,7 +665,19 @@
             }
             .chat-container {
                 width: 100%;
+                padding-top: 50px; /* Отступ под фиксированную top-bar */
                 padding-bottom: 60px; /* Отступ под фиксированный input */
+            }
+            .top-bar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                padding: 5px 10px;
+                background: var(--chat-bg);
+                z-index: 500;
+                box-shadow: 0 2px 10px var(--shadow-color);
+                flex-wrap: nowrap;
             }
             .users-panel {
                 width: 80%;
@@ -677,14 +698,18 @@
             .users-panel.active {
                 display: block;
             }
+            #close-users-btn {
+                display: block;
+                margin-bottom: 10px;
+            }
             #toggle-users-btn {
                 display: inline-block;
-                margin: 5px 0;
+                margin: 0;
                 width: auto;
                 padding: 6px 12px;
             }
             #messages {
-                height: calc(100vh - 150px); /* Учитываем комнату, кнопку и input */
+                height: calc(100vh - 110px); /* Учитываем top-bar и input */
                 margin-bottom: 5px;
                 padding: 10px;
             }
@@ -719,7 +744,7 @@
             }
             select {
                 width: 100%;
-                margin: 5px 0;
+                margin: 0;
                 padding: 8px 12px;
                 font-size: 14px;
             }
@@ -817,11 +842,13 @@
     </div>
     <div class="chat-room hidden">
         <div class="chat-container">
-            <select id="room-select" onchange="joinRoom()">
-                <option value="room1">Комната 1</option>
-                <option value="room2">Комната 2</option>
-            </select>
-            <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">👤</button>
+            <div class="top-bar">
+                <select id="room-select" onchange="joinRoom()">
+                    <option value="room1">Комната 1</option>
+                    <option value="room2">Комната 2</option>
+                </select>
+                <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">👤</button>
+            </div>
             <div id="messages"></div>
             <div class="input-container">
                 <input id="message-input" type="text" placeholder="Напиши сообщение...">
@@ -836,7 +863,7 @@
             <emoji-picker id="emoji-picker"></emoji-picker>
         </div>
         <div class="users-panel">
-            <button class="admin-btn" onclick="toggleUsersPanel()">Скрыть</button>
+            <button id="close-users-btn" class="admin-btn" onclick="toggleUsersPanel()">Скрыть</button>
             <h3>Пользователи <span id="user-count">0/0</span></h3>
             <ul id="users-list"></ul>
             <div class="admin-controls">
