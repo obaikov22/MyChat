@@ -95,11 +95,11 @@ async function getUserPermissions(username) {
         const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [username]);
         if (res.rows.length > 0) {
             return {
-                deleteMessages: res.rows[0].delete_messages,
-                muteUsers: res.rows[0].mute_users,
-                banUsers: res.rows[0].ban_users,
-                clearChat: res.rows[0].clear_chat,
-                assignGroups: res.rows[0].assign_groups
+                deleteMessages: res.rows[0].delete_messages || false,
+                muteUsers: res.rows[0].mute_users || false,
+                banUsers: res.rows[0].ban_users || false,
+                clearChat: res.rows[0].clear_chat || false,
+                assignGroups: res.rows[0].assign_groups || false
             };
         }
         return { deleteMessages: false, muteUsers: false, banUsers: false, clearChat: false, assignGroups: false };
@@ -194,7 +194,7 @@ io.on("connection", (socket) => {
         if (isValid) {
             const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: '1h' });
             users.set(socket.id, nickname);
-            const permissions = await getUserPermissions(nickname);
+            const permissions = await getUserPermissions(nickname); // Исправлено: передаём nickname
             socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
@@ -213,7 +213,7 @@ io.on("connection", (socket) => {
             const decoded = jwt.verify(token, JWT_SECRET);
             const nickname = decoded.nickname;
             users.set(socket.id, nickname);
-            const permissions = await getUserPermissions(nickname);
+            const permissions = await getUserPermissions(nickname); // Исправлено: передаём nickname
             socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
