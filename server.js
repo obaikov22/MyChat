@@ -84,12 +84,12 @@ async function getChatHistory(room) {
         const res = await pool.query(`
             SELECT * FROM messages 
             WHERE room = $1 
-            ORDER BY id ASC 
+            ORDER BY timestamp ASC 
             LIMIT ${MAX_MESSAGES}`, [room]);
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
-            timestamp: row.timestamp,
+            timestamp: new Date(row.timestamp).toLocaleTimeString(), // Форматируем время
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
@@ -247,7 +247,7 @@ io.on("connection", (socket) => {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
             return;
         }
-        const timestamp = new Date().toLocaleTimeString();
+        const timestamp = new Date().toLocaleTimeString(); // Используем локальное время
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const permissions = await getUserPermissions(username);
         const messageData = { 
