@@ -32,11 +32,12 @@ async function saveUser(nickname, password) {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const defaultAvatar = "default-avatar.png";
+        const groups = nickname.toLowerCase() === "admin" ? ['Администратор'] : [];
         await pool.query(`
             INSERT INTO users (nickname, password, avatar, groups)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (nickname) DO NOTHING`, 
-            [nickname, hashedPassword, defaultAvatar, nickname.toLowerCase() === "admin" ? ['Администратор'] : []]);
+            [nickname, hashedPassword, defaultAvatar, groups]);
     } catch (err) {
         console.error("Ошибка сохранения пользователя:", err.message);
     }
@@ -95,8 +96,9 @@ async function getUserPermissions(username) {
         const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [username]);
         if (res.rows.length > 0) {
             const user = res.rows[0];
-            const isAdmin = (user.groups || []).includes('Администратор');
-            const isModerator = (user.groups || []).includes('Модератор');
+            const groups = user.groups || [];
+            const isAdmin = groups.includes('Администратор');
+            const isModerator = groups.includes('Модератор');
             return {
                 deleteMessages: isAdmin || isModerator || user.delete_messages || false,
                 muteUsers: isAdmin || isModerator || user.mute_users || false,
@@ -192,6 +194,10 @@ async function assignGroup(targetUsername, groupName) {
 
 io.on("connection", (socket) => {
     socket.on("auth", async ({ nickname, password }) => {
+        const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
+        if (existingSocketId) {
+            users.delete(existingSocketId); // Удаляем старую сессию
+        }
         const isValid = await verifyUser(nickname, password);
         if (isValid) {
             const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: '1h' });
@@ -214,6 +220,10 @@ io.on("connection", (socket) => {
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
             const nickname = decoded.nickname;
+            const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
+            if (existingSocketId) {
+                users.delete(existingSocketId); // Удаляем старую сессию
+            }
             users.set(socket.id, nickname);
             const permissions = await getUserPermissions(nickname);
             socket.emit("auth success", { nickname, token, permissions });
