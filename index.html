@@ -790,7 +790,6 @@
         function auth() { 
             const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
-            console.log("Авторизация:", nickname, password);
             if (nickname && password) {
                 socket.emit("auth", { nickname, password });
             } else {
@@ -799,7 +798,6 @@
         }
 
         socket.on("auth success", ({ nickname, token, permissions }) => {
-            console.log("Успешная авторизация:", nickname);
             username = nickname;
             userPermissions = permissions;
             localStorage.setItem("chatToken", token);
@@ -812,7 +810,6 @@
         });
 
         socket.on("auth error", (message) => {
-            console.log("Ошибка авторизации:", message);
             authError.innerText = message;
             localStorage.removeItem("chatToken");
         });
@@ -823,7 +820,6 @@
 
         function joinRoom() {
             currentRoom = document.getElementById("room-select").value;
-            console.log("Присоединяюсь к комнате:", currentRoom);
             socket.emit("join room", currentRoom);
             document.getElementById("messages").innerHTML = "";
         }
@@ -831,12 +827,11 @@
         function compressImage(file) {
             return new Promise((resolve, reject) => {
                 new Compressor(file, {
-                    quality: 0.8, // Качество 0.8 (80%)
-                    maxWidth: 1024, // Максимальная ширина
-                    maxHeight: 1024, // Максимальная высота
-                    mimeType: 'image/jpeg', // Конвертируем в JPEG
+                    quality: 0.8,
+                    maxWidth: 1024,
+                    maxHeight: 1024,
+                    mimeType: 'image/jpeg',
                     success(result) {
-                        console.log(`Изображение сжато: ${file.size / 1024} КБ -> ${result.size / 1024} КБ`);
                         resolve(result);
                     },
                     error(err) {
@@ -875,7 +870,6 @@
                     if (xhr.status === 200) {
                         const data = JSON.parse(xhr.responseText);
                         if (data.success) {
-                            console.log("Файл загружен на ImgBB:", data.data.url);
                             resolve(data.data.url);
                         } else {
                             reject(new Error(data.error.message));
@@ -922,8 +916,6 @@
 
         async function confirmSendMedia() {
             if (!currentFile) return;
-            const fileSizeKB = currentFile.size / 1024;
-            console.log(`Загружаю файл: ${currentFile.name}, размер: ${fileSizeKB.toFixed(2)} КБ`);
             try {
                 const mediaUrl = await uploadToImgBB(currentFile);
                 if (mediaUrl) {
@@ -951,7 +943,7 @@
             if (!msg && !file) return;
 
             if (file) {
-                if (file.size > 10 * 1024 * 1024) { // 10 MB
+                if (file.size > 10 * 1024 * 1024) {
                     alert("Файл слишком большой (макс. 10 МБ)");
                     fileInput.value = "";
                     return;
@@ -1117,7 +1109,6 @@
         });
 
         socket.on("update users", ({ users, onlineCount, totalCount }) => {
-            console.log("Получены пользователи:", users, "Онлайн:", onlineCount, "Всего:", totalCount);
             usersList.innerHTML = "";
             const onlineUsers = users.slice(0, onlineCount);
             users.forEach(user => {
@@ -1210,8 +1201,6 @@
             for (const item of items) {
                 if (item.type.indexOf("image") === 0) {
                     const blob = item.getAsFile();
-                    const fileSizeKB = blob.size / 1024;
-                    console.log(`Вставка из буфера, размер: ${fileSizeKB.toFixed(2)} КБ`);
                     if (blob.size > 10 * 1024 * 1024) {
                         alert("Изображение слишком большое (макс. 10 МБ)");
                         return;
@@ -1298,7 +1287,6 @@
         }
 
         socket.on("profile updated", (message) => {
-            console.log(message);
             showProfile(username);
         });
 
