@@ -84,12 +84,12 @@ async function getChatHistory(room) {
         const res = await pool.query(`
             SELECT * FROM messages 
             WHERE room = $1 
-            ORDER BY timestamp ASC 
+            ORDER BY id ASC 
             LIMIT ${MAX_MESSAGES}`, [room]);
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
-            timestamp: new Date(row.timestamp).toLocaleTimeString(), // Форматируем время
+            timestamp: row.timestamp, // Оставляем как есть, так как это уже строка
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
@@ -193,7 +193,7 @@ async function assignRole(targetUsername, role) {
 io.on("connection", (socket) => {
     socket.on("auth", async ({ nickname, password }) => {
         const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
-        if (existingSocketId) {
+        if (existingSocketId && existingSocketId !== socket.id) {
             users.delete(existingSocketId);
             io.sockets.sockets.get(existingSocketId)?.disconnect();
         }
@@ -220,7 +220,7 @@ io.on("connection", (socket) => {
             const decoded = jwt.verify(token, JWT_SECRET);
             const nickname = decoded.nickname;
             const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
-            if (existingSocketId) {
+            if (existingSocketId && existingSocketId !== socket.id) {
                 users.delete(existingSocketId);
                 io.sockets.sockets.get(existingSocketId)?.disconnect();
             }
@@ -247,7 +247,7 @@ io.on("connection", (socket) => {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
             return;
         }
-        const timestamp = new Date().toLocaleTimeString(); // Используем локальное время
+        const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const permissions = await getUserPermissions(username);
         const messageData = { 
