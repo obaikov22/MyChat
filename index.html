@@ -34,31 +34,31 @@
         }
 
         .dark-theme {
-            /* Тёмная тема */
-            --background-gradient: linear-gradient(135deg, #2E1A47, #1C2526);
-            --chat-bg: #3C2F5A;
-            --messages-bg: #4A4063;
-            --input-bg: #3C2F5A;
-            --input-border: #5A4A7A;
-            --auth-input-bg: #5A4A7A;
-            --text-color: #D3D3D3;
-            --username-color: #A77BCA;
-            --admin-username-color: #FF6B6B;
-            --timestamp-color: #A0AEC0;
+            /* Тёмная тема (обновлённые цвета) */
+            --background-gradient: linear-gradient(135deg, #1F1727, #2A2E35);
+            --chat-bg: #2E2A40;
+            --messages-bg: #38324E;
+            --input-bg: #2E2A40;
+            --input-border: #4A4063;
+            --auth-input-bg: #403A5A;
+            --text-color: #E0E0E0;
+            --username-color: #6B5B95;
+            --admin-username-color: #E06B6B;
+            --timestamp-color: #A0A0B0;
             --offline-color: #777;
-            --button-bg: #A77BCA;
-            --button-hover-bg: #8E5BB9;
-            --admin-btn-bg: #38A3A5;
-            --admin-btn-hover-bg: #2A7C7E;
-            --delete-btn-bg: #FF6B6B;
-            --delete-btn-hover-bg: #E04F4F;
-            --reply-btn-bg: #38A3A5;
-            --reply-btn-hover-bg: #2A7C7E;
-            --shadow-color: rgba(167, 123, 202, 0.3);
-            --panel-bg: #5A4A7A;
-            --announcement-bg: #A77BCA;
-            --announcement-border: #8E5BB9;
-            --scrollbar-thumb: #A77BCA;
+            --button-bg: #6B5B95;
+            --button-hover-bg: #5A4A7A;
+            --admin-btn-bg: #4A7A8C;
+            --admin-btn-hover-bg: #3A5A6B;
+            --delete-btn-bg: #E06B6B;
+            --delete-btn-hover-bg: #C04A4A;
+            --reply-btn-bg: #4A7A8C;
+            --reply-btn-hover-bg: #3A5A6B;
+            --shadow-color: rgba(64, 58, 90, 0.3);
+            --panel-bg: #403A5A;
+            --announcement-bg: #6B5B95;
+            --announcement-border: #5A4A7A;
+            --scrollbar-thumb: #6B5B95;
         }
 
         body {
@@ -162,7 +162,7 @@
             transition: background 0.5s ease, color 0.5s ease;
         }
         .dark-theme select {
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%23A77BCA" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%236B5B95" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
         }
         .message {
             margin: 10px 0;
@@ -175,10 +175,10 @@
             transition: background 0.5s ease;
         }
         .message:hover {
-            background: #D1C4E9; /* Оставим светлый hover для читаемости */
+            background: #D1C4E9;
         }
         .dark-theme .message:hover {
-            background: #6A5B8A;
+            background: #4A4063;
         }
         .message:hover .delete-btn, .message:hover .reply-btn {
             display: inline;
@@ -235,10 +235,10 @@
             background: rgba(38, 166, 154, 0.2);
         }
         .dark-theme .reply-info {
-            background: rgba(56, 163, 165, 0.1);
+            background: rgba(74, 122, 140, 0.1);
         }
         .dark-theme .reply-info:hover {
-            background: rgba(56, 163, 165, 0.2);
+            background: rgba(74, 122, 140, 0.2);
         }
         .reply-text {
             font-style: italic;
@@ -323,7 +323,7 @@
             border-radius: 5px;
         }
         .dark-theme .users-panel li:hover {
-            background: rgba(167, 123, 202, 0.1);
+            background: rgba(107, 91, 149, 0.1);
         }
         .users-panel li.offline {
             color: var(--offline-color);
@@ -387,7 +387,7 @@
             color: var(--admin-btn-hover-bg);
         }
         .dark-theme .admin-icon:hover {
-            background: rgba(56, 163, 165, 0.2);
+            background: rgba(74, 122, 140, 0.2);
         }
         #typing-status {
             font-size: 0.9em;
