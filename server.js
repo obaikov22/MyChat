@@ -73,12 +73,12 @@ async function getChatHistory(room) {
         const res = await pool.query(`
             SELECT * FROM messages 
             WHERE room = $1 
-            ORDER BY timestamp ASC 
-            LIMIT $2`, [room, MAX_MESSAGES]);
+            ORDER BY id ASC 
+            LIMIT ${MAX_MESSAGES}`, [room]);
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
-            timestamp: row.timestamp.toISOString(),
+            timestamp: row.timestamp,
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
@@ -92,7 +92,7 @@ async function getChatHistory(room) {
 
 async function getUserPermissions(username) {
     try {
-        const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [nickname]);
+        const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [username]);
         if (res.rows.length > 0) {
             return {
                 deleteMessages: res.rows[0].delete_messages,
@@ -235,7 +235,7 @@ io.on("connection", (socket) => {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
             return;
         }
-        const timestamp = new Date().toISOString();
+        const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const permissions = await getUserPermissions(username);
         const messageData = { 

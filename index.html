@@ -1060,13 +1060,6 @@
 
         function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media }) {
             const isAdmin = msgUsername.toLowerCase() === "admin";
-            const localTime = new Date(timestamp).toLocaleString('ru-RU', { 
-                day: '2-digit', 
-                month: '2-digit', 
-                year: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            }); // Формат: "22.02.2025, 17:00"
             const replyContent = replyTo ? `
                 <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
                     ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
@@ -1090,7 +1083,7 @@
                 <div class="announcement" data-message-id="${messageId}">
                     ${replyContent}
                     <span class="username">${msgUsername} [Объявление]</span>
-                    <span class="timestamp">${localTime}</span>
+                    <span class="timestamp">${timestamp}</span>
                     <p>${msg}</p>
                     ${mediaContent}
                     ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
@@ -1100,7 +1093,7 @@
                 <div class="message" data-message-id="${messageId}">
                     ${replyContent}
                     <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
-                    <span class="timestamp">${localTime}</span>
+                    <span class="timestamp">${timestamp}</span>
                     <p>${msg}</p>
                     ${mediaContent}
                     ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
