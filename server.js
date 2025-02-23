@@ -209,11 +209,11 @@ async function getChatHistory(room, socketId) {
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
-            timestamp: row.timestamp,
+            timestamp: row.timestamp.toISOString(), // ISO-формат
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
-            media: row.media // Убрали canDelete
+            media: row.media
         }));
     } catch (err) {
         console.error("Ошибка загрузки истории:", err.message);
@@ -353,7 +353,7 @@ io.on("connection", (socket) => {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
             return;
         }
-        const timestamp = new Date().toLocaleTimeString();
+        const timestamp = new Date().toISOString(); // ISO-формат
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const permissions = await getUserPermissions(username);
         const messageData = { 
@@ -364,7 +364,7 @@ io.on("connection", (socket) => {
             messageId, 
             replyTo, 
             type: "message",
-            media // Убрали canDelete из объекта сообщения
+            media
         };
         if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
