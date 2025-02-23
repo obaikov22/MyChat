@@ -1144,42 +1144,41 @@
             showNotification(`${username} забанен`);
         });
 
-        socket.on("update users", ({ users, onlineCount, totalCount }) => {
-        usersList.innerHTML = "";
-        const onlineUsers = Array.from(users).filter(user => users.includes(user)); // Используем массив пользователей
-        users.forEach(user => {
-            const li = document.createElement("li");
-            li.textContent = user;
-            li.onclick = () => showProfile(user);
-            const isOnline = onlineUsers.includes(user);
-            if (!isOnline) {
-                li.classList.add("offline");
-            }
-            if (user.toLowerCase() === "admin") {
-                li.style.color = isOnline ? "#D32F2F" : "#999";
-            }
-            if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
-                if (userPermissions.muteUsers) {
-                    const muteIcon = document.createElement("button");
-                    muteIcon.innerHTML = "🔇";
-                    muteIcon.className = "admin-icon";
-                    muteIcon.title = "Мут";
-                    muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user); };
-                    li.appendChild(muteIcon);
+        socket.on("update users", ({ users, onlineUsers, onlineCount, totalCount }) => {
+            usersList.innerHTML = "";
+            users.forEach(user => {
+                const li = document.createElement("li");
+                li.textContent = user;
+                li.onclick = () => showProfile(user);
+                const isOnline = onlineUsers.includes(user);
+                if (!isOnline) {
+                    li.classList.add("offline");
                 }
-                if (userPermissions.banUsers) {
-                    const banIcon = document.createElement("button");
-                    banIcon.innerHTML = "🚫";
-                    banIcon.className = "admin-icon";
-                    banIcon.title = "Бан";
-                    banIcon.onclick = (e) => { e.stopPropagation(); banUser(user); };
-                    li.appendChild(banIcon);
+                if (user.toLowerCase() === "admin") {
+                    li.style.color = isOnline ? "#D32F2F" : "#999";
                 }
-            }
-            usersList.appendChild(li);
+                if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
+                    if (userPermissions.muteUsers) {
+                        const muteIcon = document.createElement("button");
+                        muteIcon.innerHTML = "🔇";
+                        muteIcon.className = "admin-icon";
+                        muteIcon.title = "Мут";
+                        muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user); };
+                        li.appendChild(muteIcon);
+                    }
+                    if (userPermissions.banUsers) {
+                        const banIcon = document.createElement("button");
+                        banIcon.innerHTML = "🚫";
+                        banIcon.className = "admin-icon";
+                        banIcon.title = "Бан";
+                        banIcon.onclick = (e) => { e.stopPropagation(); banUser(user); };
+                        li.appendChild(banIcon);
+                    }
+                }
+                usersList.appendChild(li);
+            });
+            userCount.innerText = `${onlineCount}/${totalCount}`;
         });
-        userCount.innerText = `${onlineCount}/${totalCount}`;
-    });
 
         let typingTimeout;
         messageInput.addEventListener("input", () => {
