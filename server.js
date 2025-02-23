@@ -206,7 +206,6 @@ async function getChatHistory(room, socketId) {
             WHERE room = $1 
             ORDER BY id ASC 
             LIMIT ${MAX_MESSAGES}`, [room]);
-        const userPermissions = await getUserPermissions(users.get(socketId));
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
@@ -214,8 +213,7 @@ async function getChatHistory(room, socketId) {
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
-            canDelete: userPermissions.deleteMessages,
-            media: row.media
+            media: row.media // Убрали canDelete
         }));
     } catch (err) {
         console.error("Ошибка загрузки истории:", err.message);
@@ -355,7 +353,6 @@ io.on("connection", (socket) => {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
             return;
         }
-        console.log(`Получено сообщение от ${username} в ${room}, размер media: ${media ? (media.length / 1024).toFixed(2) : 0} КБ`);
         const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const permissions = await getUserPermissions(username);
@@ -367,8 +364,7 @@ io.on("connection", (socket) => {
             messageId, 
             replyTo, 
             type: "message",
-            canDelete: permissions.deleteMessages,
-            media
+            media // Убрали canDelete из объекта сообщения
         };
         if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
