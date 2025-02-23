@@ -707,8 +707,9 @@
         <div class="users-panel">
             <h3>Пользователи <span id="user-count">0/0</span></h3>
             <ul id="users-list"></ul>
-            <div class="admin-controls hidden" id="admin-controls">
-                <button class="admin-btn" onclick="clearChat()">Очистить чат</button>
+            <div class="admin-controls">
+                <button class="admin-btn hidden" id="clear-chat-btn" onclick="clearChat()">Очистить чат</button>
+                <button class="admin-btn" onclick="logout()">Выйти</button>
             </div>
         </div>
     </div>
@@ -787,6 +788,7 @@
         const usersList = document.getElementById("users-list");
         const userCount = document.getElementById("user-count");
         const adminControls = document.getElementById("admin-controls");
+        const clearChatBtn = document.getElementById("clear-chat-btn");
         const profileModal = document.getElementById("profile-modal");
         const imageModal = document.getElementById("image-modal");
         const previewModal = document.getElementById("preview-modal");
@@ -839,7 +841,7 @@
             authContainer.classList.add("hidden");
             chatRoom.classList.remove("hidden");
             if (userPermissions.clearChat) {
-                adminControls.classList.remove("hidden");
+                clearChatBtn.classList.remove("hidden");
             }
             joinRoom();
         });
@@ -858,6 +860,20 @@
             currentRoom = document.getElementById("room-select").value;
             socket.emit("join room", currentRoom);
             document.getElementById("messages").innerHTML = "";
+        }
+
+        function logout() {
+            socket.disconnect(); // Отключаем сокет
+            localStorage.removeItem("chatToken"); // Удаляем токен
+            username = "";
+            userPermissions = {};
+            chatRoom.classList.add("hidden");
+            authContainer.classList.remove("hidden");
+            nicknameInput.value = "";
+            passwordInput.value = "";
+            authError.innerText = "";
+            clearChatBtn.classList.add("hidden");
+            socket.connect(); // Переподключаем сокет для следующего входа
         }
 
         function compressImage(file) {
