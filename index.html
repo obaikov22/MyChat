@@ -737,6 +737,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.2.1/compressor.min.js"></script>
     <script src="/emoji-picker/index.js" type="module"></script>
     <script>
         const socket = io();
@@ -827,10 +828,34 @@
             document.getElementById("messages").innerHTML = "";
         }
 
-        function uploadToImgBB(file) {
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                new Compressor(file, {
+                    quality: 0.8, // Качество 0.8 (80%)
+                    maxWidth: 1024, // Максимальная ширина
+                    maxHeight: 1024, // Максимальная высота
+                    mimeType: 'image/jpeg', // Конвертируем в JPEG
+                    success(result) {
+                        console.log(`Изображение сжато: ${file.size / 1024} КБ -> ${result.size / 1024} КБ`);
+                        resolve(result);
+                    },
+                    error(err) {
+                        console.error("Ошибка сжатия:", err);
+                        reject(err);
+                    }
+                });
+            });
+        }
+
+        async function uploadToImgBB(file) {
+            let fileToUpload = file;
+            if (file.type.startsWith("image/")) {
+                fileToUpload = await compressImage(file);
+            }
+
             return new Promise((resolve, reject) => {
                 const formData = new FormData();
-                formData.append("image", file);
+                formData.append("image", fileToUpload);
                 formData.append("key", IMGBB_API_KEY);
 
                 const xhr = new XMLHttpRequest();
