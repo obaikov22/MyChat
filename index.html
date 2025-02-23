@@ -284,8 +284,8 @@
         #new-messages-count {
             display: none;
             position: absolute;
-            bottom: 10px;
-            right: 10px;
+            bottom: 50px;
+            right: 15px;
             background: #A77BCA;
             color: #FFFFFF;
             width: 24px;
@@ -769,7 +769,7 @@
                 box-shadow: 0 -2px 10px var(--shadow-color);
             }
             #new-messages-count {
-                bottom: 50px; /* Над input-container */
+                bottom: 70px; /* Над input-container на мобильных */
                 right: 15px;
             }
             #message-input {
@@ -1061,20 +1061,22 @@
             }
         }
 
+        function hideNewMessagesDivider() {
+            newMessagesDivider.style.transition = "opacity 0.5s ease";
+            newMessagesDivider.style.opacity = "0";
+            setTimeout(() => {
+                newMessagesDivider.style.display = "none";
+                newMessagesDivider.style.opacity = "1";
+            }, 500);
+        }
+
         function showNewMessagesDivider(lastReadId, firstNewId) {
             const lastReadMessage = document.querySelector(`[data-message-id="${lastReadId}"]`);
             const firstNewMessage = document.querySelector(`[data-message-id="${firstNewId}"]`);
             if (lastReadMessage && firstNewMessage) {
                 messagesContainer.insertBefore(newMessagesDivider, firstNewMessage);
                 newMessagesDivider.style.display = "block";
-                setTimeout(() => {
-                    newMessagesDivider.style.transition = "opacity 0.5s ease";
-                    newMessagesDivider.style.opacity = "0";
-                    setTimeout(() => {
-                        newMessagesDivider.style.display = "none";
-                        newMessagesDivider.style.opacity = "1";
-                    }, 500);
-                }, 3000);
+                setTimeout(hideNewMessagesDivider, 3000);
             }
         }
 
@@ -1290,6 +1292,13 @@
                 replyingTo = null;
                 messageInput.placeholder = "Напиши сообщение...";
                 cancelReplyBtn.classList.add("hidden");
+                if (newMessages > 0) {
+                    newMessages = 0;
+                    newMessagesCount.style.display = "none";
+                    lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
+                    stopTitleBlink();
+                    hideNewMessagesDivider();
+                }
             }
         }
 
@@ -1417,6 +1426,7 @@
                 if (isAtBottom && isFocused) {
                     messages.scrollTop = messages.scrollHeight;
                     lastReadMessageId = messageData.messageId;
+                    hideNewMessagesDivider(); // Убираем разделитель, если пользователь внизу
                 } else {
                     newMessages++;
                     newMessagesCount.textContent = newMessages;
@@ -1424,7 +1434,7 @@
                     if (!isFocused) {
                         startTitleBlink();
                     }
-                    if (lastReadMessageId && !newMessagesDivider.style.display) {
+                    if (lastReadMessageId && newMessagesDivider.style.display !== "block") {
                         showNewMessagesDivider(lastReadMessageId, messageData.messageId);
                     }
                 }
@@ -1441,6 +1451,7 @@
                 if (isAtBottom && isFocused) {
                     messages.scrollTop = messages.scrollHeight;
                     lastReadMessageId = messageData.messageId;
+                    hideNewMessagesDivider(); // Убираем разделитель, если пользователь внизу
                 } else {
                     newMessages++;
                     newMessagesCount.textContent = newMessages;
@@ -1448,7 +1459,7 @@
                     if (!isFocused) {
                         startTitleBlink();
                     }
-                    if (lastReadMessageId && !newMessagesDivider.style.display) {
+                    if (lastReadMessageId && newMessagesDivider.style.display !== "block") {
                         showNewMessagesDivider(lastReadMessageId, messageData.messageId);
                     }
                 }
@@ -1462,6 +1473,7 @@
                 newMessagesCount.style.display = "none";
                 lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
                 stopTitleBlink();
+                hideNewMessagesDivider(); // Убираем разделитель при прокрутке до конца
             }
         });
 
@@ -1472,6 +1484,7 @@
                     newMessages = 0;
                     newMessagesCount.style.display = "none";
                     lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
+                    hideNewMessagesDivider(); // Убираем разделитель при возвращении в фокус и прокрутке до конца
                 }
             }
         });
@@ -1487,6 +1500,7 @@
             newMessagesCount.style.display = "none";
             lastReadMessageId = null;
             stopTitleBlink();
+            hideNewMessagesDivider(); // Убираем разделитель при очистке чата
         });
 
         socket.on("user muted", ({ username, duration }) => {
