@@ -723,25 +723,26 @@
             }
             .chat-container {
                 width: 100%;
-                padding-top: 50px;
-                padding-bottom: 60px;
+                padding-top: 60px; /* Увеличил для лучшего размещения топ-бара */
+                padding-bottom: 80px; /* Увеличил для места под панель ввода */
             }
             .top-bar {
                 position: fixed;
                 top: 0;
                 left: 0;
                 width: 100%;
-                padding: 5px 10px;
+                padding: 10px;
                 background: var(--chat-bg);
-                z-index: 500;
+                z-index: 600;
                 box-shadow: 0 2px 10px var(--shadow-color);
                 flex-wrap: nowrap;
+                justify-content: space-between; /* Распределяем элементы равномерно */
             }
             .users-panel {
-                width: 80%;
-                max-width: 300px;
-                margin: 0;
-                padding: 10px;
+                width: 90%;
+                max-width: 320px; /* Увеличил максимальную ширину для удобства */
+                margin: 0 auto;
+                padding: 15px;
                 border-radius: 10px;
                 position: fixed;
                 top: 10%;
@@ -749,151 +750,157 @@
                 transform: translateX(-50%);
                 height: 70vh;
                 overflow-y: auto;
-                z-index: 1000;
+                z-index: 700;
                 display: none;
                 box-shadow: 0 4px 15px var(--shadow-color);
+                background: var(--panel-bg);
             }
             .users-panel.active {
                 display: block;
             }
-            #close-users-btn {
-                display: block;
-                margin-bottom: 10px;
-            }
-            #toggle-users-btn {
-                display: inline-block;
-                margin: 0;
-                width: auto;
-                padding: 6px 12px;
+            #close-users-btn, #toggle-users-btn {
+                padding: 10px 15px; /* Увеличил размер кнопок */
+                font-size: 16px;
+                min-width: 50px; /* Минимальная ширина для удобства нажатия */
             }
             #messages {
-                height: calc(100vh - 110px);
-                margin-bottom: 5px;
+                height: calc(100vh - 140px); /* Уменьшил высоту для учета панелей ввода и топ-бара */
+                margin-bottom: 10px;
                 padding: 10px;
+                font-size: 16px; /* Увеличил шрифт для читаемости */
             }
             .input-container {
                 position: fixed;
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                padding: 5px 10px;
+                padding: 10px;
                 background: var(--chat-bg);
-                flex-wrap: nowrap;
-                gap: 5px;
-                z-index: 500;
+                flex-wrap: wrap;
+                gap: 8px;
+                z-index: 600;
                 box-shadow: 0 -2px 10px var(--shadow-color);
             }
             #new-messages-count {
-                bottom: 70px;
-                right: 15px;
+                bottom: 90px; /* Сдвинул вниз для избежания перекрытия клавиатурой */
+                right: 20px;
             }
             #message-input {
-                width: 100%;
-                padding: 8px 12px;
-                font-size: 14px;
+                width: 70%;
+                padding: 12px 15px; /* Увеличил для удобства ввода */
+                font-size: 16px; /* Увеличил шрифт */
+                min-width: 200px; /* Минимальная ширина для удобства */
+                border-radius: 30px; /* Немного увеличил радиус для эстетики */
             }
-            #emoji-button, button, #attach-button {
-                padding: 8px;
-                font-size: 16px;
-                min-width: 40px;
+            #emoji-button, #attach-button, button {
+                padding: 12px; /* Увеличил размер кнопок */
+                font-size: 18px; /* Увеличил иконки */
+                min-width: 50px; /* Минимальная ширина для удобства нажатия */
+                border-radius: 30px; /* Сделал кнопки округлыми */
             }
             #cancel-reply-btn {
-                padding: 6px 10px;
-                font-size: 12px;
+                padding: 10px 15px; /* Увеличил размер */
+                font-size: 14px; /* Увеличил шрифт */
+                min-width: 50px;
+                border-radius: 30px;
             }
             #upload-progress {
-                width: 100%;
+                width: 70%;
             }
             select {
                 width: 100%;
-                margin: 0;
-                padding: 8px 12px;
-                font-size: 14px;
+                padding: 12px 15px; /* Увеличил для удобства */
+                font-size: 16px; /* Увеличил шрифт */
+                border-radius: 30px;
             }
             .message, .announcement {
-                max-width: 90%;
-                padding: 8px 12px;
-                font-size: 14px;
+                max-width: 95%; /* Увеличил ширину для читаемости */
+                padding: 12px 15px; /* Увеличил отступы */
+                font-size: 16px; /* Увеличил шрифт */
+                margin: 8px 0; /* Добавил отступы между сообщениями */
             }
             .delete-btn, .reply-btn {
-                padding: 4px 8px;
-                font-size: 12px;
-            }
-            .delete-btn {
-                right: 5px;
-            }
-            .reply-btn {
-                right: 50px;
+                padding: 8px 12px; /* Увеличил размер */
+                font-size: 14px; /* Увеличил шрифт */
+                border-radius: 20px;
             }
             .message-avatar {
-                width: 24px;
-                height: 24px;
+                width: 30px; /* Увеличил размер аватарок */
+                height: 30px;
             }
             .auth-container h2 {
-                font-size: 1.3em;
+                font-size: 1.5em; /* Увеличил заголовок */
             }
             #nickname-input, #password-input {
                 width: 100%;
-                padding: 8px 12px;
-                font-size: 14px;
+                padding: 12px 15px; /* Увеличил для удобства */
+                font-size: 16px; /* Увеличил шрифт */
+                border-radius: 30px;
             }
             .auth-container button {
                 width: 48%;
-                padding: 8px 12px;
-                font-size: 14px;
+                padding: 12px 15px; /* Увеличил размер */
+                font-size: 16px; /* Увеличил шрифт */
                 margin: 5px 1%;
+                border-radius: 30px;
             }
             emoji-picker {
-                bottom: 60px;
+                bottom: 80px; /* Сдвинул вниз, чтобы не перекрывалась клавиатурой */
                 left: 5px;
                 width: calc(100% - 10px);
-                max-height: 40vh;
+                max-height: 200px; /* Ограничил высоту для мобильных */
+                font-size: 24px; /* Увеличил размер эмодзи */
             }
             .modal, .image-modal, .preview-modal {
                 align-items: flex-start;
                 padding-top: 10px;
             }
             .modal-content, .image-modal-content, .preview-modal-content {
-                width: 100%;
+                width: 90%;
                 max-width: 100%;
                 height: calc(100vh - 20px);
                 margin: 0 5px;
-                border-radius: 10px 10px 0 0;
+                border-radius: 15px;
                 overflow-y: auto;
                 padding: 15px;
+                font-size: 16px; /* Увеличил шрифт */
             }
             .modal-content img {
-                width: 60px;
-                height: 60px;
+                width: 80px; /* Уменьшил для мобильных */
+                height: 80px;
             }
             .image-modal-content img, .preview-modal-content img, .preview-modal-content video {
                 max-width: 100%;
-                max-height: calc(100vh - 60px);
+                max-height: calc(100vh - 80px);
             }
             #notification {
-                top: 5px;
-                right: 5px;
-                width: calc(100% - 10px);
+                top: 10px;
+                right: 10px;
+                width: 90%;
                 max-width: 90%;
-                padding: 8px 12px;
-                font-size: 14px;
+                padding: 12px 15px; /* Увеличил размер */
+                font-size: 16px; /* Увеличил шрифт */
+                border-radius: 20px;
             }
             .profile-info h4 {
-                font-size: 1.2em;
+                font-size: 1.3em; /* Увеличил заголовок */
             }
             .profile-info .status, .profile-info .age {
-                font-size: 0.8em;
+                font-size: 0.9em; /* Немного увеличил */
             }
             .edit-form input, .edit-form textarea, .group-form select {
-                font-size: 0.9em;
-                padding: 8px;
+                font-size: 16px; /* Увеличил шрифт */
+                padding: 12px; /* Увеличил отступы */
+                border-radius: 20px;
             }
             .edit-form button, .group-form button {
-                padding: 8px;
-                font-size: 0.9em;
+                padding: 12px; /* Увеличил размер */
+                font-size: 16px; /* Увеличил шрифт */
+                border-radius: 30px;
             }
             .media-container img, .media-container video, .media-container audio {
                 max-width: 100%;
+                border-radius: 15px;
             }
         }
     </style>
@@ -1252,14 +1259,22 @@
             if (file.type.startsWith("image/")) {
                 const img = document.createElement("img");
                 img.src = fileUrl;
+                img.style.maxWidth = "100%";
+                img.style.maxHeight = "80vh";
                 previewContent.appendChild(img);
             } else if (file.type.startsWith("video/")) {
                 const video = document.createElement("video");
                 video.src = fileUrl;
                 video.controls = true;
+                video.style.maxWidth = "100%";
+                video.style.maxHeight = "80vh";
                 previewContent.appendChild(video);
             }
             previewModal.style.display = "flex";
+            if (window.innerWidth <= 768) {
+                previewModal.style.alignItems = "flex-start";
+                previewModal.style.paddingTop = "20px";
+            }
         }
 
         function closePreviewModal() {
@@ -1627,12 +1642,16 @@
         emojiButton.addEventListener("click", () => {
             const isVisible = emojiPicker.style.display === "block";
             emojiPicker.style.display = isVisible ? "none" : "block";
-            if (!isVisible && window.innerWidth <= 768) {
-                emojiPicker.style.bottom = "60px";
+            if (window.innerWidth <= 768) {
+                emojiPicker.style.bottom = "80px"; // Убедимся, что не перекрывается клавиатурой
                 emojiPicker.style.left = "5px";
-            } else if (!isVisible) {
+                emojiPicker.style.width = "calc(100% - 10px)";
+                emojiPicker.style.maxHeight = "200px";
+            } else {
                 emojiPicker.style.top = `${messageInput.offsetTop - 300}px`;
                 emojiPicker.style.left = `${messageInput.offsetLeft}px`;
+                emojiPicker.style.width = "auto";
+                emojiPicker.style.maxHeight = "400px";
             }
         });
 
@@ -1640,6 +1659,9 @@
             messageInput.value += event.detail.unicode;
             emojiPicker.style.display = "none";
             messageInput.focus();
+            if (window.innerWidth <= 768) {
+                emojiPicker.style.bottom = "-1000px"; // Скрываем за экраном
+            }
         });
 
         attachButton.addEventListener("click", () => {
