@@ -763,6 +763,23 @@
                 font-size: 16px;
                 min-width: 50px; /* Минимальная ширина для удобства нажатия */
             }
+            #toggle-users-btn {
+            display: inline-block;
+            margin: 0;
+            padding: 10px 15px;
+            font-size: 20px; /* Увеличил размер иконки для удобства */
+            min-width: 50px;
+            border-radius: 30px;
+            background: var(--admin-btn-bg);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+        #toggle-users-btn:hover {
+            background: var(--admin-btn-hover-bg);
+            transform: translateY(-2px);
+        }
             #messages {
                 height: calc(100vh - 140px); /* Уменьшил высоту для учета панелей ввода и топ-бара */
                 margin-bottom: 10px;
