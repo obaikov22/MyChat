@@ -6,7 +6,6 @@
     <meta charset="UTF-8">
     <style>
         :root {
-            /* Светлая тема (по умолчанию) */
             --background-gradient: linear-gradient(135deg, #E8DAEF, #F5F5F5);
             --chat-bg: #FFFFFF;
             --messages-bg: #F9F9F9;
@@ -34,7 +33,6 @@
         }
 
         .dark-theme {
-            /* Тёмная тема */
             --background-gradient: linear-gradient(135deg, #1F1727, #2A2E35);
             --chat-bg: #2E2A40;
             --messages-bg: #38324E;
@@ -267,7 +265,7 @@
             font-style: italic;
             color: var(--timestamp-color);
             display: -webkit-box;
-            line-clamp: 2;
+            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -947,7 +945,7 @@
         <div class="modal-content">
             <button class="close-btn" onclick="closeProfileModal()">✖</button>
             <div class="profile-header">
-                <img id="profile-avatar" src="default-avatar.png" alt="Avatar">
+                <img id="profile-avatar" src="https://via.placeholder.com/100" alt="Avatar">
                 <div class="profile-info">
                     <h4 id="profile-nickname"></h4>
                     <p id="profile-age" class="age"></p>
@@ -1004,7 +1002,7 @@
         let replyingTo = null;
         let userPermissions = {};
         const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57";
-        let avatarCache = new Map(); // Кэш аватарок
+        let avatarCache = new Map();
 
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
@@ -1328,8 +1326,8 @@
 
         function replyToMessage(messageId) {
             replyingTo = messageId;
-            const repliedMessage = document.querySelector(`[data-message-id="${messageId}"] p`).textContent;
-            messageInput.placeholder = `Ответ на: "${repliedMessage.slice(0, 20) || "[Медиа]"}..."`;
+            const repliedMessage = document.querySelector(`[data-message-id="${messageId}"] p`)?.textContent || "[Медиа]";
+            messageInput.placeholder = `Ответ на: "${repliedMessage.slice(0, 20)}..."`;
             messageInput.focus();
             cancelReplyBtn.classList.remove("hidden");
         }
@@ -1358,9 +1356,7 @@
         }
 
         function muteUser(targetUsername) {
-            if (username === targetUsername) {
-                return;
-            }
+            if (username === targetUsername) return;
             const duration = prompt(`На сколько секунд замутить ${targetUsername}? (например, 60)`);
             if (duration && !isNaN(duration)) {
                 socket.emit("mute user", { room: currentRoom, targetUsername, duration: parseInt(duration) });
@@ -1368,9 +1364,7 @@
         }
 
         function banUser(targetUsername) {
-            if (username === targetUsername) {
-                return;
-            }
+            if (username === targetUsername) return;
             if (confirm(`Забанить ${targetUsername}?`)) {
                 socket.emit("ban user", { room: currentRoom, targetUsername });
             }
@@ -1399,18 +1393,18 @@
             ` : "";
             let mediaContent = "";
             if (media) {
-                if (media.startsWith("data:image/") || media.startsWith("http")) {
+                if (media.match(/\.(jpeg|jpg|png|gif)$/i)) {
                     mediaContent = `<div class="media-container"><img src="${media}" alt="Attached image" onclick="showImageModal('${media}')"></div>`;
-                } else if (media.startsWith("data:video/") || media.startsWith("http") && media.endsWith(".mp4")) {
+                } else if (media.match(/\.(mp4|webm)$/i)) {
                     mediaContent = `<div class="media-container"><video controls src="${media}"></video></div>`;
-                } else if (media.startsWith("data:audio/") || media.startsWith("http") && media.endsWith(".mp3")) {
+                } else if (media.match(/\.(mp3|wav)$/i)) {
                     mediaContent = `<div class="media-container"><audio controls src="${media}"></audio></div>`;
                 }
             }
-            avatarCache.set(msgUsername, avatar || "default-avatar.png");
+            avatarCache.set(msgUsername, avatar || "https://via.placeholder.com/30");
             return type === "announcement" ? `
                 <div class="announcement" data-message-id="${messageId}">
-                    <img src="${avatar || 'default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <img src="${avatar || 'https://via.placeholder.com/30'}" class="message-avatar" alt="${msgUsername}'s avatar">
                     <div class="message-content">
                         ${replyContent}
                         <span class="username">${msgUsername} [Объявление]</span>
@@ -1423,7 +1417,7 @@
                 </div>
             ` : `
                 <div class="message" data-message-id="${messageId}">
-                    <img src="${avatar || 'default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <img src="${avatar || 'https://via.placeholder.com/30'}" class="message-avatar" alt="${msgUsername}'s avatar">
                     <div class="message-content">
                         ${replyContent}
                         <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
@@ -1463,9 +1457,7 @@
                     newMessages++;
                     newMessagesCount.textContent = newMessages;
                     newMessagesCount.style.display = "block";
-                    if (!isFocused) {
-                        startTitleBlink();
-                    }
+                    if (!isFocused) startTitleBlink();
                     if (lastReadMessageId && newMessagesDivider.style.display !== "block") {
                         showNewMessagesDivider(lastReadMessageId, messageData.messageId);
                     }
@@ -1488,9 +1480,7 @@
                     newMessages++;
                     newMessagesCount.textContent = newMessages;
                     newMessagesCount.style.display = "block";
-                    if (!isFocused) {
-                        startTitleBlink();
-                    }
+                    if (!isFocused) startTitleBlink();
                     if (lastReadMessageId && newMessagesDivider.style.display !== "block") {
                         showNewMessagesDivider(lastReadMessageId, messageData.messageId);
                     }
@@ -1545,10 +1535,15 @@
 
         socket.on("update users", ({ users, onlineUsers, onlineCount, totalCount }) => {
             usersList.innerHTML = "";
+            if (!users || users.length === 0) {
+                usersList.innerHTML = "<li>Нет пользователей</li>";
+                userCount.innerText = "0/0";
+                return;
+            }
             users.forEach(user => {
                 const li = document.createElement("li");
                 const avatarImg = document.createElement("img");
-                avatarImg.src = user.avatar || "default-avatar.png";
+                avatarImg.src = user.avatar || "https://via.placeholder.com/30";
                 avatarImg.className = "user-avatar";
                 avatarImg.alt = `${user.nickname}'s avatar`;
                 const nameSpan = document.createElement("span");
@@ -1557,11 +1552,9 @@
                 li.appendChild(nameSpan);
                 li.onclick = () => showProfile(user.nickname);
                 const isOnline = onlineUsers.includes(user.nickname);
-                if (!isOnline) {
-                    li.classList.add("offline");
-                }
+                if (!isOnline) li.classList.add("offline");
                 if (user.nickname.toLowerCase() === "admin") {
-                    li.style.color = isOnline ? "#D32F2F" : "#999";
+                    nameSpan.style.color = isOnline ? "#D32F2F" : "#999";
                 }
                 if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
                     if (userPermissions.muteUsers) {
@@ -1582,19 +1575,19 @@
                     }
                 }
                 usersList.appendChild(li);
-                avatarCache.set(user.nickname, user.avatar || "default-avatar.png");
+                avatarCache.set(user.nickname, user.avatar || "https://via.placeholder.com/30");
             });
             userCount.innerText = `${onlineCount}/${totalCount}`;
         });
 
         socket.on("update users avatars", (users) => {
             users.forEach(user => {
-                avatarCache.set(user.nickname, user.avatar || "default-avatar.png");
+                avatarCache.set(user.nickname, user.avatar || "https://via.placeholder.com/30");
                 document.querySelectorAll(`.message-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
-                    img.src = user.avatar || "default-avatar.png";
+                    img.src = user.avatar || "https://via.placeholder.com/30";
                 });
                 document.querySelectorAll(`.user-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
-                    img.src = user.avatar || "default-avatar.png";
+                    img.src = user.avatar || "https://via.placeholder.com/30";
                 });
             });
         });
@@ -1617,9 +1610,7 @@
         });
 
         messageInput.addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                sendMessage();
-            }
+            if (event.key === "Enter") sendMessage();
         });
 
         emojiButton.addEventListener("click", () => {
@@ -1645,9 +1636,7 @@
         });
 
         fileInput.addEventListener("change", () => {
-            if (fileInput.files.length > 0) {
-                sendMessage();
-            }
+            if (fileInput.files.length > 0) sendMessage();
         });
 
         messageInput.addEventListener("paste", async (event) => {
@@ -1676,7 +1665,7 @@
                 return;
             }
             document.getElementById("profile-nickname").textContent = nickname;
-            document.getElementById("profile-avatar").src = avatar || "default-avatar.png";
+            document.getElementById("profile-avatar").src = avatar || "https://via.placeholder.com/100";
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
             const statusEl = document.getElementById("profile-status");
             const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));
@@ -1701,7 +1690,7 @@
                     font-size: 0.85em;
                     color: ${role === 'admin' ? "#FF0000" : "#9B59B6"};
                     font-weight: 500;
-                    box-shadow: 0 2px 5px var(--shadow-color);`
+                    box-shadow: 0 2px 5px var(--shadow-color);`;
                 achievementsEl.appendChild(span);
             }
             document.getElementById("profile-bio").textContent = bio || "Нет подписи";
