@@ -179,6 +179,8 @@
             position: relative;
             max-width: 70%;
             word-wrap: break-word;
+            display: flex;
+            align-items: flex-start;
             transition: background 0.5s ease;
         }
         .message:hover {
@@ -202,6 +204,8 @@
             font-weight: 500;
             position: relative;
             transition: background 0.5s ease, border 0.5s ease, box-shadow 0.5s ease;
+            display: flex;
+            align-items: flex-start;
         }
         .announcement .username {
             color: white;
@@ -214,6 +218,18 @@
         }
         .announcement:hover {
             background: var(--button-hover-bg);
+        }
+        .message-avatar, .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+            object-fit: cover;
+            border: 2px solid var(--username-color);
+            transition: border 0.5s ease;
+        }
+        .message-content {
+            flex-grow: 1;
         }
         .username {
             font-weight: 600;
@@ -251,7 +267,7 @@
             font-style: italic;
             color: var(--timestamp-color);
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -364,8 +380,8 @@
             padding: 8px 0;
             color: var(--text-color);
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
             font-size: 0.95em;
             cursor: pointer;
             transition: background 0.2s ease, color 0.5s ease;
@@ -810,6 +826,10 @@
             .reply-btn {
                 right: 50px;
             }
+            .message-avatar {
+                width: 24px;
+                height: 24px;
+            }
             .auth-container h2 {
                 font-size: 1.3em;
             }
@@ -984,6 +1004,7 @@
         let replyingTo = null;
         let userPermissions = {};
         const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57";
+        let avatarCache = new Map(); // Кэш аватарок
 
         const messageInput = document.getElementById("message-input");
         const emojiButton = document.getElementById("emoji-button");
@@ -1024,7 +1045,6 @@
         socket.off("chat history");
         socket.off("update users");
 
-        // Загрузка темы из localStorage
         if (localStorage.getItem("theme") === "dark") {
             document.body.classList.add("dark-theme");
             themeToggleBtn.textContent = "Светлая тема";
@@ -1366,7 +1386,7 @@
             fullImage.src = "";
         }
 
-        function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media }) {
+        function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
             const isAdmin = msgUsername.toLowerCase() === "admin";
             const replyContent = replyTo ? `
                 <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
@@ -1387,25 +1407,32 @@
                     mediaContent = `<div class="media-container"><audio controls src="${media}"></audio></div>`;
                 }
             }
+            avatarCache.set(msgUsername, avatar || "default-avatar.png");
             return type === "announcement" ? `
                 <div class="announcement" data-message-id="${messageId}">
-                    ${replyContent}
-                    <span class="username">${msgUsername} [Объявление]</span>
-                    <span class="timestamp">${timestamp}</span>
-                    <p>${msg}</p>
-                    ${mediaContent}
-                    ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                    <img src="${avatar || 'default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <div class="message-content">
+                        ${replyContent}
+                        <span class="username">${msgUsername} [Объявление]</span>
+                        <span class="timestamp">${timestamp}</span>
+                        <p>${msg}</p>
+                        ${mediaContent}
+                        ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                        <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                    </div>
                 </div>
             ` : `
                 <div class="message" data-message-id="${messageId}">
-                    ${replyContent}
-                    <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
-                    <span class="timestamp">${timestamp}</span>
-                    <p>${msg}</p>
-                    ${mediaContent}
-                    ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                    <img src="${avatar || 'default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <div class="message-content">
+                        ${replyContent}
+                        <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                        <span class="timestamp">${timestamp}</span>
+                        <p>${msg}</p>
+                        ${mediaContent}
+                        ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                        <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                    </div>
                 </div>
             `;
         }
@@ -1520,13 +1547,20 @@
             usersList.innerHTML = "";
             users.forEach(user => {
                 const li = document.createElement("li");
-                li.textContent = user;
-                li.onclick = () => showProfile(user);
-                const isOnline = onlineUsers.includes(user);
+                const avatarImg = document.createElement("img");
+                avatarImg.src = user.avatar || "default-avatar.png";
+                avatarImg.className = "user-avatar";
+                avatarImg.alt = `${user.nickname}'s avatar`;
+                const nameSpan = document.createElement("span");
+                nameSpan.textContent = user.nickname;
+                li.appendChild(avatarImg);
+                li.appendChild(nameSpan);
+                li.onclick = () => showProfile(user.nickname);
+                const isOnline = onlineUsers.includes(user.nickname);
                 if (!isOnline) {
                     li.classList.add("offline");
                 }
-                if (user.toLowerCase() === "admin") {
+                if (user.nickname.toLowerCase() === "admin") {
                     li.style.color = isOnline ? "#D32F2F" : "#999";
                 }
                 if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
@@ -1535,7 +1569,7 @@
                         muteIcon.innerHTML = "🔇";
                         muteIcon.className = "admin-icon";
                         muteIcon.title = "Мут";
-                        muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user); };
+                        muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.nickname); };
                         li.appendChild(muteIcon);
                     }
                     if (userPermissions.banUsers) {
@@ -1543,13 +1577,26 @@
                         banIcon.innerHTML = "🚫";
                         banIcon.className = "admin-icon";
                         banIcon.title = "Бан";
-                        banIcon.onclick = (e) => { e.stopPropagation(); banUser(user); };
+                        banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.nickname); };
                         li.appendChild(banIcon);
                     }
                 }
                 usersList.appendChild(li);
+                avatarCache.set(user.nickname, user.avatar || "default-avatar.png");
             });
             userCount.innerText = `${onlineCount}/${totalCount}`;
+        });
+
+        socket.on("update users avatars", (users) => {
+            users.forEach(user => {
+                avatarCache.set(user.nickname, user.avatar || "default-avatar.png");
+                document.querySelectorAll(`.message-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
+                    img.src = user.avatar || "default-avatar.png";
+                });
+                document.querySelectorAll(`.user-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
+                    img.src = user.avatar || "default-avatar.png";
+                });
+            });
         });
 
         let typingTimeout;
