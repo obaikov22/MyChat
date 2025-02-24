@@ -31,7 +31,7 @@ app.get('/', (req, res) => {
 async function saveUser(nickname, password) {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const defaultAvatar = "https://placehold.co/30x30"; // Используем рабочий URL
+        const defaultAvatar = "/default-avatar.png"; // Используем локальный файл
         const role = nickname.toLowerCase() === "admin" ? 'admin' : 'user';
         await pool.query(`
             INSERT INTO users (nickname, password, avatar, role)
@@ -96,7 +96,7 @@ async function getChatHistory(room) {
             replyTo: row.reply_to,
             type: row.type,
             media: row.media,
-            avatar: row.avatar || "https://placehold.co/30x30"
+            avatar: row.avatar || "/default-avatar.png"
         }));
     } catch (err) {
         console.error("Ошибка загрузки истории:", err.message);
@@ -139,7 +139,7 @@ async function getAllUsers() {
         const res = await pool.query('SELECT nickname, avatar FROM users');
         return res.rows.map(row => ({
             nickname: row.nickname,
-            avatar: row.avatar || "https://placehold.co/30x30"
+            avatar: row.avatar || "/default-avatar.png"
         }));
     } catch (err) {
         console.error("Ошибка получения списка пользователей:", err.message);
@@ -154,7 +154,7 @@ async function getUserProfile(username) {
             const user = res.rows[0];
             return {
                 nickname: user.nickname,
-                avatar: user.avatar || "https://placehold.co/30x30",
+                avatar: user.avatar || "/default-avatar.png",
                 age: user.age,
                 last_seen: user.last_seen,
                 bio: user.bio,

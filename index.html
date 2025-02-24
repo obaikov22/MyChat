@@ -379,7 +379,8 @@
             color: var(--text-color);
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start; /* Изменил на flex-start для выравнивания */
+            gap: 10px; /* Добавил отступ между аватаркой и ником */
             font-size: 0.95em;
             cursor: pointer;
             transition: background 0.2s ease, color 0.5s ease;
@@ -945,7 +946,7 @@
         <div class="modal-content">
             <button class="close-btn" onclick="closeProfileModal()">✖</button>
             <div class="profile-header">
-                <img id="profile-avatar" src="https://via.placeholder.com/100" alt="Avatar">
+                <img id="profile-avatar" src="/default-avatar.png" alt="Avatar">
                 <div class="profile-info">
                     <h4 id="profile-nickname"></h4>
                     <p id="profile-age" class="age"></p>
@@ -994,7 +995,7 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.2.1/compressor.min.js"></script>
-    <script src="/emoji-picker/index.js" type="module"></script>
+    <script src="https://unpkg.com/emoji-picker-element@latest/index.js" type="module"></script>
     <script>
         const socket = io();
         let currentRoom = "room1";
@@ -1381,7 +1382,7 @@
         }
 
         function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
-            const isAdmin = msgUsername.toLowerCase() === "admin";
+            const isAdmin = msgUsername?.toLowerCase() === "admin";
             const replyContent = replyTo ? `
                 <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
                     ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
@@ -1401,10 +1402,10 @@
                     mediaContent = `<div class="media-container"><audio controls src="${media}"></audio></div>`;
                 }
             }
-            avatarCache.set(msgUsername, avatar || "https://via.placeholder.com/30");
+            avatarCache.set(msgUsername, avatar || "/default-avatar.png");
             return type === "announcement" ? `
                 <div class="announcement" data-message-id="${messageId}">
-                    <img src="${avatar || 'https://via.placeholder.com/30'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
                     <div class="message-content">
                         ${replyContent}
                         <span class="username">${msgUsername} [Объявление]</span>
@@ -1417,7 +1418,7 @@
                 </div>
             ` : `
                 <div class="message" data-message-id="${messageId}">
-                    <img src="${avatar || 'https://via.placeholder.com/30'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
                     <div class="message-content">
                         ${replyContent}
                         <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
@@ -1541,9 +1542,10 @@
                 return;
             }
             users.forEach(user => {
+                if (!user || !user.nickname) return;
                 const li = document.createElement("li");
                 const avatarImg = document.createElement("img");
-                avatarImg.src = user.avatar || "https://via.placeholder.com/30";
+                avatarImg.src = user.avatar || "/default-avatar.png";
                 avatarImg.className = "user-avatar";
                 avatarImg.alt = `${user.nickname}'s avatar`;
                 const nameSpan = document.createElement("span");
@@ -1575,19 +1577,20 @@
                     }
                 }
                 usersList.appendChild(li);
-                avatarCache.set(user.nickname, user.avatar || "https://via.placeholder.com/30");
+                avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
             });
             userCount.innerText = `${onlineCount}/${totalCount}`;
         });
 
         socket.on("update users avatars", (users) => {
             users.forEach(user => {
-                avatarCache.set(user.nickname, user.avatar || "https://via.placeholder.com/30");
+                if (!user || !user.nickname) return;
+                avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
                 document.querySelectorAll(`.message-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
-                    img.src = user.avatar || "https://via.placeholder.com/30";
+                    img.src = user.avatar || "/default-avatar.png";
                 });
                 document.querySelectorAll(`.user-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
-                    img.src = user.avatar || "https://via.placeholder.com/30";
+                    img.src = user.avatar || "/default-avatar.png";
                 });
             });
         });
@@ -1665,7 +1668,7 @@
                 return;
             }
             document.getElementById("profile-nickname").textContent = nickname;
-            document.getElementById("profile-avatar").src = avatar || "https://via.placeholder.com/100";
+            document.getElementById("profile-avatar").src = avatar || "/default-avatar.png";
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
             const statusEl = document.getElementById("profile-status");
             const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));
