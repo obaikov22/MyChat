@@ -31,7 +31,7 @@ app.get('/', (req, res) => {
 async function saveUser(nickname, password) {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const defaultAvatar = "default-avatar.png";
+        const defaultAvatar = "https://placehold.co/30x30"; // Используем рабочий URL
         const role = nickname.toLowerCase() === "admin" ? 'admin' : 'user';
         await pool.query(`
             INSERT INTO users (nickname, password, avatar, role)
@@ -82,18 +82,21 @@ async function saveMessage({ room, username, msg, timestamp, messageId, replyTo,
 async function getChatHistory(room) {
     try {
         const res = await pool.query(`
-            SELECT * FROM messages 
-            WHERE room = $1 
-            ORDER BY id ASC 
+            SELECT m.*, u.avatar 
+            FROM messages m
+            JOIN users u ON m.username = u.nickname
+            WHERE m.room = $1 
+            ORDER BY m.id ASC 
             LIMIT ${MAX_MESSAGES}`, [room]);
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
-            timestamp: row.timestamp, // Оставляем как есть, так как это уже строка
+            timestamp: row.timestamp,
             messageId: row.message_id,
             replyTo: row.reply_to,
             type: row.type,
-            media: row.media
+            media: row.media,
+            avatar: row.avatar || "https://placehold.co/30x30"
         }));
     } catch (err) {
         console.error("Ошибка загрузки истории:", err.message);
@@ -133,8 +136,11 @@ async function getUserPermissions(username) {
 
 async function getAllUsers() {
     try {
-        const res = await pool.query('SELECT nickname FROM users');
-        return res.rows.map(row => row.nickname);
+        const res = await pool.query('SELECT nickname, avatar FROM users');
+        return res.rows.map(row => ({
+            nickname: row.nickname,
+            avatar: row.avatar || "https://placehold.co/30x30"
+        }));
     } catch (err) {
         console.error("Ошибка получения списка пользователей:", err.message);
         return [];
@@ -148,7 +154,7 @@ async function getUserProfile(username) {
             const user = res.rows[0];
             return {
                 nickname: user.nickname,
-                avatar: user.avatar,
+                avatar: user.avatar || "https://placehold.co/30x30",
                 age: user.age,
                 last_seen: user.last_seen,
                 bio: user.bio,
@@ -173,6 +179,8 @@ async function updateUserProfile(username, { avatar, age, bio }) {
                 last_seen = NOW()
             WHERE nickname = $4`, 
             [avatar, age, bio, username]);
+        const allUsers = await getAllUsers();
+        io.emit("update users avatars", allUsers);
     } catch (err) {
         console.error("Ошибка обновления профиля:", err.message);
     }
@@ -207,7 +215,7 @@ io.on("connection", (socket) => {
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
                 users: allUsers, 
-                onlineUsers: onlineUsers, // Отправляем точный список онлайн-пользователей
+                onlineUsers,
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
@@ -232,7 +240,7 @@ io.on("connection", (socket) => {
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
                 users: allUsers, 
-                onlineUsers: onlineUsers, // Отправляем точный список онлайн-пользователей
+                onlineUsers,
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
@@ -252,6 +260,7 @@ io.on("connection", (socket) => {
         const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const permissions = await getUserPermissions(username);
+        const userProfile = await getUserProfile(username);
         const messageData = { 
             room, 
             username, 
@@ -260,7 +269,8 @@ io.on("connection", (socket) => {
             messageId, 
             replyTo, 
             type: "message",
-            media
+            media,
+            avatar: userProfile.avatar
         };
         if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
@@ -330,6 +340,7 @@ io.on("connection", (socket) => {
                 const onlineUsers = Array.from(users.values());
                 io.emit("update users", { 
                     users: allUsers, 
+                    onlineUsers,
                     onlineCount: onlineUsers.length, 
                     totalCount: allUsers.length 
                 });
@@ -389,7 +400,7 @@ io.on("connection", (socket) => {
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
                 users: allUsers, 
-                onlineUsers: onlineUsers, // Отправляем точный список онлайн-пользователей
+                onlineUsers,
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
