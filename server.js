@@ -5,6 +5,7 @@ const io = require('socket.io')(http, { cors: { origin: "*" } });
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -24,6 +25,7 @@ pool.connect()
 
 app.use(express.static(__dirname));
 
+app.use(cookieParser());
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
@@ -199,7 +201,7 @@ async function assignRole(targetUsername, role) {
 }
 
 io.on("connection", (socket) => {
-    socket.on("auth", async ({ nickname, password }) => {
+    socket.on("auth", async ({ nickname, password, rememberMe }) => {
         const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
         if (existingSocketId && existingSocketId !== socket.id) {
             users.delete(existingSocketId);
@@ -207,9 +209,11 @@ io.on("connection", (socket) => {
         }
         const isValid = await verifyUser(nickname, password);
         if (isValid) {
-            const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: '1h' });
+            const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: rememberMe ? '30d' : '1h' });
             users.set(socket.id, nickname);
             const permissions = await getUserPermissions(nickname);
+            // Сохраняем токен в cookies
+            socket.handshake.headers.cookie = `chatToken=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=${rememberMe ? 2592000 : 3600}`; // 30 дней или 1 час
             socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
@@ -225,6 +229,11 @@ io.on("connection", (socket) => {
     });
 
     socket.on("auto login", async (token) => {
+        // Если токен не передан, попробуем взять его из cookies
+        if (!token && socket.request.headers.cookie) {
+            const cookies = cookieParser.parse(socket.request.headers.cookie);
+            token = cookies.chatToken;
+        }
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
             const nickname = decoded.nickname;
@@ -392,10 +401,10 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", async () => {
-        const username = users.get(socket.id);
-        if (username) {
+        const nickname = users.get(socket.id);
+        if (nickname) {
             users.delete(socket.id);
-            await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [username]);
+            await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [nickname]);
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
@@ -404,6 +413,10 @@ io.on("connection", (socket) => {
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
+        }
+        // Очищаем cookies при отключении
+        if (socket.request.headers.cookie) {
+            socket.handshake.headers.cookie = `chatToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
         }
     });
 });
