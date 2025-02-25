@@ -92,25 +92,6 @@
             align-items: center;
             gap: 10px;
             margin-bottom: 20px;
-            padding: 10px;
-            background: var(--chat-bg);
-            border-bottom: 1px solid var(--input-border);
-            transition: background 0.5s ease, border-color 0.5s ease;
-        }
-        .top-bar select {
-            padding: 12px 15px;
-            border: none;
-            border-radius: 25px;
-            background: var(--auth-input-bg);
-            margin-bottom: 0;
-            width: 150px;
-            cursor: pointer;
-            color: var(--text-color);
-            appearance: none;
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%239B59B6" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            transition: background 0.5s ease, color 0.5s ease;
         }
         #messages {
             height: 500px;
@@ -186,9 +167,6 @@
             transition: background 0.5s ease, color 0.5s ease;
         }
         .dark-theme select {
-            background-image: url('data:image/svg+xml;utf8,<svg fill="%236B5B95" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
-        }
-        .dark-theme .top-bar select {
             background-image: url('data:image/svg+xml;utf8,<svg fill="%236B5B95" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
         }
         .message {
@@ -958,7 +936,6 @@
                 <select id="room-select" onchange="joinRoom()">
                     <option value="room1">Комната 1</option>
                     <option value="room2">Комната 2</option>
-                    <option value="room3">Комната 3</option>
                 </select>
                 <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">👤</button>
             </div>
@@ -1589,64 +1566,61 @@
             showNotification(`${username} забанен`);
         });
 
-        socket.on("update users", ({ users, onlineUsers, onlineCount, totalCount, channel }) => {
-            usersList.innerHTML = "";
-            if (!users || users.length === 0) {
-                usersList.innerHTML = "<li>Нет пользователей</li>";
-                userCount.innerText = "0/0";
-                return;
+        socket.on("update users", ({ users, onlineUsers, onlineCount, totalCount }) => {
+    usersList.innerHTML = "";
+    if (!users || users.length === 0) {
+        usersList.innerHTML = "<li>Нет пользователей</li>";
+        userCount.innerText = "0/0";
+        return;
+    }
+
+    // Сортируем пользователей: онлайн вверху, оффлайн внизу
+    users.sort((a, b) => {
+        const isAOnline = onlineUsers.includes(a.nickname);
+        const isBOnline = onlineUsers.includes(b.nickname);
+        return isBOnline - isAOnline; // Онлайн (true = 1) вверху, оффлайн (false = 0) внизу
+    });
+
+    users.forEach(user => {
+        if (!user || !user.nickname) return;
+        const li = document.createElement("li");
+        const avatarImg = document.createElement("img");
+        avatarImg.src = user.avatar || "/default-avatar.png";
+        avatarImg.className = "user-avatar";
+        avatarImg.alt = `${user.nickname}'s avatar`;
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = user.nickname;
+        li.appendChild(avatarImg);
+        li.appendChild(nameSpan);
+        li.onclick = () => showProfile(user.nickname);
+        const isOnline = onlineUsers.includes(user.nickname);
+        if (!isOnline) li.classList.add("offline");
+        if (user.nickname.toLowerCase() === "admin") {
+            nameSpan.style.color = isOnline ? "#D32F2F" : "#999";
+        }
+        if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
+            if (userPermissions.muteUsers) {
+                const muteIcon = document.createElement("button");
+                muteIcon.innerHTML = "🔇";
+                muteIcon.className = "admin-icon";
+                muteIcon.title = "Мут";
+                muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.nickname); };
+                li.appendChild(muteIcon);
             }
-
-            // Сортируем пользователей: онлайн вверху, оффлайн внизу
-            users.sort((a, b) => {
-                const isAOnline = onlineUsers.includes(a.nickname);
-                const isBOnline = onlineUsers.includes(b.nickname);
-                return isBOnline - isAOnline; // Онлайн (true = 1) вверху, оффлайн (false = 0) внизу
-            });
-
-            users.forEach(user => {
-                if (!user || !user.nickname) return;
-                // Проверяем, находится ли пользователь в текущем канале
-                if (onlineUsers.includes(user.nickname)) {
-                    const li = document.createElement("li");
-                    const avatarImg = document.createElement("img");
-                    avatarImg.src = user.avatar || "/default-avatar.png";
-                    avatarImg.className = "user-avatar";
-                    avatarImg.alt = `${user.nickname}'s avatar`;
-                    const nameSpan = document.createElement("span");
-                    nameSpan.textContent = user.nickname;
-                    li.appendChild(avatarImg);
-                    li.appendChild(nameSpan);
-                    li.onclick = () => showProfile(user.nickname);
-                    const isOnline = onlineUsers.includes(user.nickname);
-                    if (!isOnline) li.classList.add("offline");
-                    if (user.nickname.toLowerCase() === "admin") {
-                        nameSpan.style.color = isOnline ? "#D32F2F" : "#999";
-                    }
-                    if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
-                        if (userPermissions.muteUsers) {
-                            const muteIcon = document.createElement("button");
-                            muteIcon.innerHTML = "🔇";
-                            muteIcon.className = "admin-icon";
-                            muteIcon.title = "Мут";
-                            muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.nickname); };
-                            li.appendChild(muteIcon);
-                        }
-                        if (userPermissions.banUsers) {
-                            const banIcon = document.createElement("button");
-                            banIcon.innerHTML = "🚫";
-                            banIcon.className = "admin-icon";
-                            banIcon.title = "Бан";
-                            banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.nickname); };
-                            li.appendChild(banIcon);
-                        }
-                    }
-                    usersList.appendChild(li);
-                    avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
-                }
-            });
-            userCount.innerText = `${onlineCount}/${totalCount}`;
-        });
+            if (userPermissions.banUsers) {
+                const banIcon = document.createElement("button");
+                banIcon.innerHTML = "🚫";
+                banIcon.className = "admin-icon";
+                banIcon.title = "Бан";
+                banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.nickname); };
+                li.appendChild(banIcon);
+            }
+        }
+        usersList.appendChild(li);
+        avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
+    });
+    userCount.innerText = `${onlineCount}/${totalCount}`;
+});
 
         socket.on("update users avatars", (users) => {
             users.forEach(user => {
