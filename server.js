@@ -210,10 +210,10 @@ io.on("connection", (socket) => {
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
-                users: await allUsers, 
+                users: await getAllUsers, 
                 onlineUsers,
                 onlineCount: onlineUsers.length, 
-                totalCount: (await allUsers()).length 
+                totalCount: (await getAllUsers()).length 
             });
         } else {
             socket.emit("auth error", "Неверный ник или пароль");
@@ -235,10 +235,10 @@ io.on("connection", (socket) => {
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
-                users: await allUsers, 
+                users: await getAllUsers, 
                 onlineUsers,
                 onlineCount: onlineUsers.length, 
-                totalCount: (await allUsers()).length 
+                totalCount: (await getAllUsers()).length 
             });
         } catch (err) {
             socket.emit("auth error", "Неверный или просроченный токен");
@@ -362,10 +362,10 @@ io.on("connection", (socket) => {
                 const allUsers = await getAllUsers();
                 const onlineUsers = Array.from(users.values());
                 io.emit("update users", { 
-                    users: await allUsers, 
+                    users: await getAllUsers, 
                     onlineUsers,
                     onlineCount: onlineUsers.length, 
-                    totalCount: (await allUsers()).length 
+                    totalCount: (await getAllUsers()).length 
                 });
                 io.sockets.sockets.get(targetSocketId)?.disconnect();
             }
@@ -422,10 +422,10 @@ io.on("connection", (socket) => {
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
-                users: await allUsers, 
+                users: await getAllUsers, 
                 onlineUsers,
                 onlineCount: onlineUsers.length, 
-                totalCount: (await allUsers()).length 
+                totalCount: (await getAllUsers()).length 
             });
         }
     });
