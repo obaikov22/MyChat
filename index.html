@@ -13,8 +13,8 @@
             --input-border: #E0E0E0;
             --auth-input-bg: #F2E7FE;
             --text-color: #333;
-            --username-color: #9B59B6;
-            --admin-username-color: #D32F2F;
+            --nickname-color: #9B59B6;
+            --admin-nickname-color: #D32F2F;
             --timestamp-color: #78909C;
             --offline-color: #999;
             --button-bg: #9B59B6;
@@ -40,8 +40,8 @@
             --input-border: #4A4063;
             --auth-input-bg: #403A5A;
             --text-color: #E0E0E0;
-            --username-color: #6B5B95;
-            --admin-username-color: #E06B6B;
+            --nickname-color: #6B5B95;
+            --admin-nickname-color: #E06B6B;
             --timestamp-color: #A0A0B0;
             --offline-color: #777;
             --button-bg: #6B5B95;
@@ -123,10 +123,10 @@
             transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
         }
         #message-input:focus {
-            border-color: var(--username-color);
+            border-color: var(--nickname-color);
             box-shadow: 0 0 5px var(--shadow-color);
         }
-        #username-input, #password-input {
+        #nickname-input, #password-input {
             width: 50%;
             padding: 12px;
             border: none;
@@ -205,7 +205,7 @@
             display: flex;
             align-items: flex-start;
         }
-        .announcement .username {
+        .announcement .nickname {
             color: white;
         }
         .announcement .timestamp {
@@ -223,18 +223,18 @@
             border-radius: 50%;
             margin-right: 10px;
             object-fit: cover;
-            border: 2px solid var(--username-color);
+            border: 2px solid var(--nickname-color);
             transition: border 0.5s ease;
         }
         .message-content {
             flex-grow: 1;
         }
-        .username {
+        .nickname {
             font-weight: 600;
-            color: var(--username-color);
+            color: var(--nickname-color);
         }
-        .username.admin {
-            color: var(--admin-username-color);
+        .nickname.admin {
+            color: var(--admin-nickname-color);
         }
         .timestamp {
             font-size: 0.85em;
@@ -360,7 +360,7 @@
         .users-panel h3 {
             margin: 0 0 15px 0;
             font-size: 1.2em;
-            color: var(--username-color);
+            color: var(--nickname-color);
             font-weight: 600;
             display: inline;
         }
@@ -561,7 +561,7 @@
             height: 100px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid var(--username-color);
+            border: 3px solid var(--nickname-color);
             transition: border 0.5s ease;
         }
         .modal-content img:hover {
@@ -634,7 +634,7 @@
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 0.85em;
-            color: var(--username-color);
+            color: var(--nickname-color);
             font-weight: 500;
             box-shadow: 0 2px 5px var(--shadow-color);
             transition: background 0.5s ease, color 0.5s ease, box-shadow 0.5s ease;
@@ -686,7 +686,7 @@
             transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
         }
         .edit-form input:focus, .edit-form textarea:focus, .group-form select:focus {
-            border-color: var(--username-color);
+            border-color: var(--nickname-color);
             outline: none;
         }
         .edit-form textarea {
@@ -848,7 +848,7 @@
             .auth-container h2 {
                 font-size: 1.5em; /* Увеличил заголовок */
             }
-            #username-input, #password-input {
+            #nickname-input, #password-input {
                 width: 100%;
                 padding: 12px 15px; /* Увеличил для удобства */
                 font-size: 16px; /* Увеличил шрифт */
@@ -925,7 +925,7 @@
 <body>
     <div class="auth-container">
         <h2>Вход / Регистрация</h2>
-        <input id="username-input" type="text" placeholder="Твой ник">
+        <input id="nickname-input" type="text" placeholder="Твой ник">
         <input id="password-input" type="password" placeholder="Пароль">
         <button onclick="auth()">Войти</button> 
         <div id="auth-error"></div>
@@ -973,7 +973,7 @@
             <div class="profile-header">
                 <img id="profile-avatar" src="/default-avatar.png" alt="Avatar">
                 <div class="profile-info">
-                    <h4 id="profile-username"></h4>
+                    <h4 id="profile-nickname"></h4>
                     <p id="profile-age" class="age"></p>
                     <p id="profile-status" class="status"></p>
                 </div>
@@ -1024,7 +1024,7 @@
     <script>
         const socket = io();
         let currentRoom = "room1";
-        let username = "";
+        let nickname = "";
         let replyingTo = null;
         let userPermissions = {};
         const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57";
@@ -1035,7 +1035,7 @@
         const attachButton = document.getElementById("attach-button");
         const fileInput = document.getElementById("file-input");
         const emojiPicker = document.getElementById("emoji-picker");
-        const usernameInput = document.getElementById("username-input");
+        const nicknameInput = document.getElementById("nickname-input");
         const passwordInput = document.getElementById("password-input");
         const chatRoom = document.querySelector(".chat-room");
         const authContainer = document.querySelector(".auth-container");
@@ -1146,17 +1146,17 @@
         });
 
         function auth() { 
-            const username = usernameInput.value.trim();
+            const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
-            if (username && password) {
-                socket.emit("auth", { username, password });
+            if (nickname && password) {
+                socket.emit("auth", { nickname, password });
             } else {
                 authError.innerText = "Ник и пароль обязательны";
             }
         }
 
-        socket.on("auth success", ({ username, token, permissions }) => {
-            username = username;
+        socket.on("auth success", ({ nickname, token, permissions }) => {
+            nickname = nickname;
             userPermissions = permissions;
             localStorage.setItem("chatToken", token);
             authContainer.classList.add("hidden");
@@ -1192,11 +1192,11 @@
         function logout() {
             socket.disconnect();
             localStorage.removeItem("chatToken");
-            username = "";
+            nickname = "";
             userPermissions = {};
             chatRoom.classList.add("hidden");
             authContainer.classList.remove("hidden");
-            usernameInput.value = "";
+            nicknameInput.value = "";
             passwordInput.value = "";
             authError.innerText = "";
             clearChatBtn.classList.add("hidden");
@@ -1390,7 +1390,7 @@
         }
 
         function muteUser(targetUsername) {
-            if (username === targetUsername) return;
+            if (nickname === targetUsername) return;
             const duration = prompt(`На сколько секунд замутить ${targetUsername}? (например, 60)`);
             if (duration && !isNaN(duration)) {
                 socket.emit("mute user", { room: currentRoom, targetUsername, duration: parseInt(duration) });
@@ -1398,7 +1398,7 @@
         }
 
         function banUser(targetUsername) {
-            if (username === targetUsername) return;
+            if (nickname === targetUsername) return;
             if (confirm(`Забанить ${targetUsername}?`)) {
                 socket.emit("ban user", { room: currentRoom, targetUsername });
             }
@@ -1414,11 +1414,11 @@
             fullImage.src = "";
         }
 
-        function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
+        function renderMessage({ type, nickname: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
             const isAdmin = msgUsername?.toLowerCase() === "admin";
             const replyContent = replyTo ? `
                 <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
-                    ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
+                    ${document.querySelector(`[data-message-id="${replyTo}"] .nickname`)?.textContent || "Кто-то"}:
                     <span class="reply-text">${
                         document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || 
                         (document.querySelector(`[data-message-id="${replyTo}"] .media-container`) ? "[Медиа]" : "Сообщение удалено")
@@ -1441,7 +1441,7 @@
                     <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
                     <div class="message-content">
                         ${replyContent}
-                        <span class="username">${msgUsername} [Объявление]</span>
+                        <span class="nickname">${msgUsername} [Объявление]</span>
                         <span class="timestamp">${timestamp}</span>
                         <p>${msg}</p>
                         ${mediaContent}
@@ -1454,7 +1454,7 @@
                     <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
                     <div class="message-content">
                         ${replyContent}
-                        <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                        <span class="nickname ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
                         <span class="timestamp">${timestamp}</span>
                         <p>${msg}</p>
                         ${mediaContent}
@@ -1559,12 +1559,12 @@
             hideNewMessagesDivider();
         });
 
-        socket.on("user muted", ({ username, duration }) => {
-            showNotification(`${username} замучен на ${duration} секунд`);
+        socket.on("user muted", ({ nickname, duration }) => {
+            showNotification(`${nickname} замучен на ${duration} секунд`);
         });
 
-        socket.on("user banned", (username) => {
-            showNotification(`${username} забанен`);
+        socket.on("user banned", (nickname) => {
+            showNotification(`${nickname} забанен`);
         });
 
         socket.on("update users", ({ users, onlineUsers, onlineCount, totalCount, room }) => {
@@ -1577,28 +1577,28 @@
 
         // Сортируем пользователей: онлайн вверху, оффлайн внизу
             users.sort((a, b) => {
-                const isAOnline = onlineUsers.includes(a.username);
-                const isBOnline = onlineUsers.includes(b.username);
+                const isAOnline = onlineUsers.includes(a.nickname);
+                const isBOnline = onlineUsers.includes(b.nickname);
                 return isBOnline - isAOnline; // Онлайн (true = 1) вверху, оффлайн (false = 0) внизу
             });
 
             users.forEach(user => {
-                if (!user || !user.username) return;
+                if (!user || !user.nickname) return;
                 // Проверяем, находится ли пользователь в текущей комнате
-                if (onlineUsers.includes(user.username)) {
+                if (onlineUsers.includes(user.nickname)) {
                     const li = document.createElement("li");
                     const avatarImg = document.createElement("img");
                     avatarImg.src = user.avatar || "/default-avatar.png";
                     avatarImg.className = "user-avatar";
-                    avatarImg.alt = `${user.username}'s avatar`;
+                    avatarImg.alt = `${user.nickname}'s avatar`;
                     const nameSpan = document.createElement("span");
-                    nameSpan.textContent = user.username;
+                    nameSpan.textContent = user.nickname;
                     li.appendChild(avatarImg);
                     li.appendChild(nameSpan);
-                    li.onclick = () => showProfile(user.username);
-                    const isOnline = onlineUsers.includes(user.username);
+                    li.onclick = () => showProfile(user.nickname);
+                    const isOnline = onlineUsers.includes(user.nickname);
                     if (!isOnline) li.classList.add("offline");
-                    if (user.username.toLowerCase() === "admin") {
+                    if (user.nickname.toLowerCase() === "admin") {
                         nameSpan.style.color = isOnline ? "#D32F2F" : "#999";
                     }
                     if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
@@ -1607,7 +1607,7 @@
                             muteIcon.innerHTML = "🔇";
                             muteIcon.className = "admin-icon";
                             muteIcon.title = "Мут";
-                            muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.username); };
+                            muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.nickname); };
                             li.appendChild(muteIcon);
                         }
                         if (userPermissions.banUsers) {
@@ -1615,12 +1615,12 @@
                             banIcon.innerHTML = "🚫";
                             banIcon.className = "admin-icon";
                             banIcon.title = "Бан";
-                            banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.username); };
+                            banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.nickname); };
                             li.appendChild(banIcon);
                         }
                     }
                     usersList.appendChild(li);
-                    avatarCache.set(user.username, user.avatar || "/default-avatar.png");
+                    avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
                 }
             });
             userCount.innerText = `${onlineCount}/${totalCount}`;
@@ -1628,12 +1628,12 @@
 
         socket.on("update users avatars", (users) => {
             users.forEach(user => {
-                if (!user || !user.username) return;
-                avatarCache.set(user.username, user.avatar || "/default-avatar.png");
-                document.querySelectorAll(`.message-avatar[alt="${user.username}'s avatar"]`).forEach(img => {
+                if (!user || !user.nickname) return;
+                avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
+                document.querySelectorAll(`.message-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
                     img.src = user.avatar || "/default-avatar.png";
                 });
-                document.querySelectorAll(`.user-avatar[alt="${user.username}'s avatar"]`).forEach(img => {
+                document.querySelectorAll(`.user-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
                     img.src = user.avatar || "/default-avatar.png";
                 });
             });
@@ -1648,8 +1648,8 @@
             }, 1000);
         });
 
-        socket.on("typing", (username) => {
-            document.getElementById("typing-status").textContent = `${username} пишет...`;
+        socket.on("typing", (nickname) => {
+            document.getElementById("typing-status").textContent = `${nickname} пишет...`;
         });
 
         socket.on("stop typing", () => {
@@ -1713,16 +1713,16 @@
             socket.emit("get profile", targetUsername);
         }
 
-        socket.on("profile data", ({ username, avatar, age, last_seen, bio, achievements, role, isOwnProfile, canAssignGroups }) => {
-            if (!username) {
+        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, role, isOwnProfile, canAssignGroups }) => {
+            if (!nickname) {
                 showNotification("Профиль не найден");
                 return;
             }
-            document.getElementById("profile-username").textContent = username;
+            document.getElementById("profile-nickname").textContent = nickname;
             document.getElementById("profile-avatar").src = avatar || "/default-avatar.png";
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
             const statusEl = document.getElementById("profile-status");
-            const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(username));
+            const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));
             statusEl.className = "status " + (isOnline ? "online" : "offline");
             statusEl.textContent = isOnline ? "Онлайн" : `Последний раз: ${new Date(last_seen).toLocaleString()}`;
             const achievementsEl = document.getElementById("profile-achievements");
@@ -1785,7 +1785,7 @@
         }
 
         socket.on("profile updated", (message) => {
-            showProfile(username);
+            showProfile(nickname);
         });
 
         function cancelEdit() {
@@ -1799,14 +1799,14 @@
         function assignGroup() {
             const role = document.getElementById("group-select").value;
             if (role) {
-                socket.emit("assign group", { targetUsername: document.getElementById("profile-username").textContent, role });
+                socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, role });
             }
             closeProfileModal();
         }
 
         socket.on("group assigned", (message) => {
             showNotification(message);
-            showProfile(document.getElementById("profile-username").textContent);
+            showProfile(document.getElementById("profile-nickname").textContent);
         });
 
         function cancelGroupForm() {

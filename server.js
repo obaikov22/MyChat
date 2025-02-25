@@ -30,38 +30,38 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
-async function saveUser(username, password) {
+async function saveUser(nickname, password) {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const defaultAvatar = "/default-avatar.png"; // Используем локальный файл
-        const role = username.toLowerCase() === "admin" ? 'admin' : 'user';
+        const role = nickname.toLowerCase() === "admin" ? 'admin' : 'user';
         await pool.query(`
-            INSERT INTO users (username, password, avatar, role)
+            INSERT INTO users (nickname, password, avatar, role)
             VALUES ($1, $2, $3, $4)
-            ON CONFLICT (username) DO UPDATE 
+            ON CONFLICT (nickname) DO UPDATE 
             SET password = EXCLUDED.password, 
                 avatar = COALESCE(EXCLUDED.avatar, users.avatar), 
                 role = EXCLUDED.role`,
-            [username, hashedPassword, defaultAvatar, role]);
+            [nickname, hashedPassword, defaultAvatar, role]);
     } catch (err) {
         console.error("Ошибка сохранения пользователя:", err.message);
     }
 }
 
-async function verifyUser(username, password) {
+async function verifyUser(nickname, password) {
     try {
-        const res = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [nickname]);
         if (res.rows.length === 0) {
-            await saveUser(username, password);
+            await saveUser(nickname, password);
             return true;
         }
         const user = res.rows[0];
         const isValid = await bcrypt.compare(password, user.password);
-        if (isValid && username.toLowerCase() === "admin" && user.role !== 'admin') {
+        if (isValid && nickname.toLowerCase() === "admin" && user.role !== 'admin') {
             await pool.query(`
                 UPDATE users 
                 SET role = 'admin'
-                WHERE username = $1`, [username]);
+                WHERE nickname = $1`, [nickname]);
         }
         return isValid;
     } catch (err) {
@@ -70,39 +70,14 @@ async function verifyUser(username, password) {
     }
 }
 
-async function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type, media }) {
+async function saveMessage({ room, nickname, msg, timestamp, messageId, replyTo, type, media }) {
     try {
         await pool.query(`
-            INSERT INTO messages (room, username, msg, timestamp, message_id, reply_to, type, media)
+            INSERT INTO messages (room, nickname, msg, timestamp, message_id, reply_to, type, media)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [room, username, msg, timestamp, messageId, replyTo, type, media]);
+            [room, nickname, msg, timestamp, messageId, replyTo, type, media]);
     } catch (err) {
         console.error("Ошибка сохранения сообщения:", err.message);
-    }
-}
-
-async function getChatHistory(room) {
-    try {
-        const res = await pool.query(`
-            SELECT m.*, u.avatar 
-            FROM messages m
-            JOIN users u ON m.username = u.username
-            WHERE m.room = $1 
-            ORDER BY m.id ASC 
-            LIMIT ${MAX_MESSAGES}`, [room]);
-        return res.rows.map(row => ({
-            username: row.username,
-            msg: row.msg,
-            timestamp: row.timestamp,
-            messageId: row.message_id,
-            replyTo: row.reply_to,
-            type: row.type,
-            media: row.media,
-            avatar: row.avatar || "/default-avatar.png"
-        }));
-    } catch (err) {
-        console.error("Ошибка загрузки истории:", err.message);
-        return [];
     }
 }
 
@@ -111,9 +86,9 @@ async function loadChatHistory(socket, room) {
     socket.emit("chat history", result.rows);
 }
 
-async function getUserPermissions(username) {
+async function getUserPermissions(nickname) {
     try {
-        const res = await pool.query('SELECT role FROM users WHERE username = $1', [username]);
+        const res = await pool.query('SELECT role FROM users WHERE nickname = $1', [nickname]);
         if (res.rows.length > 0) {
             const role = res.rows[0].role || 'user';
             if (role === 'admin') {
@@ -143,9 +118,9 @@ async function getUserPermissions(username) {
 
 async function getAllUsers() {
     try {
-        const res = await pool.query('SELECT username, avatar FROM users');
+        const res = await pool.query('SELECT nickname, avatar FROM users');
         return res.rows.map(row => ({
-            username: row.username,
+            nickname: row.nickname,
             avatar: row.avatar || "/default-avatar.png"
         }));
     } catch (err) {
@@ -154,13 +129,13 @@ async function getAllUsers() {
     }
 }
 
-async function getUserProfile(username) {
+async function getUserProfile(nickname) {
     try {
-        const res = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [nickname]);
         if (res.rows.length > 0) {
             const user = res.rows[0];
             return {
-                username: user.username,
+                nickname: user.nickname,
                 avatar: user.avatar || "/default-avatar.png",
                 age: user.age,
                 last_seen: user.last_seen,
@@ -176,12 +151,12 @@ async function getUserProfile(username) {
     }
 }
 
-async function getUserAvatar(username) {
-    const result = await pool.query('SELECT avatar FROM users WHERE username = $1', [username]);
+async function getUserAvatar(nickname) {
+    const result = await pool.query('SELECT avatar FROM users WHERE nickname = $1', [nickname]);
     return result.rows[0]?.avatar || "/default-avatar.png";
 }
 
-async function updateUserProfile(username, { avatar, age, bio }) {
+async function updateUserProfile(nickname, { avatar, age, bio }) {
     try {
         await pool.query(`
             UPDATE users 
@@ -189,8 +164,8 @@ async function updateUserProfile(username, { avatar, age, bio }) {
                 age = COALESCE($2, age), 
                 bio = COALESCE($3, bio), 
                 last_seen = NOW()
-            WHERE username = $4`, 
-            [avatar, age, bio, username]);
+            WHERE nickname = $4`, 
+            [avatar, age, bio, nickname]);
         const allUsers = await getAllUsers();
         io.emit("update users avatars", allUsers);
     } catch (err) {
@@ -203,7 +178,7 @@ async function assignRole(targetUsername, role) {
         await pool.query(`
             UPDATE users 
             SET role = $1
-            WHERE username = $2`, 
+            WHERE nickname = $2`, 
             [role, targetUsername]);
     } catch (err) {
         console.error("Ошибка назначения роли:", err.message);
@@ -211,18 +186,18 @@ async function assignRole(targetUsername, role) {
 }
 
 io.on("connection", (socket) => {
-    socket.on("auth", async ({ username, password }) => {
-        const existingSocketId = [...users.entries()].find(([_, name]) => name === username)?.[0];
+    socket.on("auth", async ({ nickname, password }) => {
+        const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
         if (existingSocketId && existingSocketId !== socket.id) {
             users.delete(existingSocketId);
             io.sockets.sockets.get(existingSocketId)?.disconnect();
         }
-        const isValid = await verifyUser(username, password);
+        const isValid = await verifyUser(nickname, password);
         if (isValid) {
-            const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '1h' });
-            users.set(socket.id, username);
-            const permissions = await getUserPermissions(username);
-            socket.emit("auth success", { username, token, permissions });
+            const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: '1h' });
+            users.set(socket.id, nickname);
+            const permissions = await getUserPermissions(nickname);
+            socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
@@ -239,15 +214,15 @@ io.on("connection", (socket) => {
     socket.on("auto login", async (token) => {
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
-            const username = decoded.username;
-            const existingSocketId = [...users.entries()].find(([_, name]) => name === username)?.[0];
+            const nickname = decoded.nickname;
+            const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
             if (existingSocketId && existingSocketId !== socket.id) {
                 users.delete(existingSocketId);
                 io.sockets.sockets.get(existingSocketId)?.disconnect();
             }
-            users.set(socket.id, username);
-            const permissions = await getUserPermissions(username);
-            socket.emit("auth success", { username, token, permissions });
+            users.set(socket.id, nickname);
+            const permissions = await getUserPermissions(nickname);
+            socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
@@ -262,8 +237,8 @@ io.on("connection", (socket) => {
     });
 
     socket.on("chat message", async ({ room, msg, replyTo, media }) => {
-        const username = users.get(socket.id);
-        if (!username) return;
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
         const isMuted = mutedUsers.has(socket.id) && mutedUsers.get(socket.id) > Date.now();
         if (isMuted) {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
@@ -271,11 +246,11 @@ io.on("connection", (socket) => {
         }
         const timestamp = new Date().toLocaleTimeString();
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-        const permissions = await getUserPermissions(username);
-        const userProfile = await getUserProfile(username);
+        const permissions = await getUserPermissions(nickname);
+        const userProfile = await getUserProfile(nickname);
         const messageData = { 
             room, 
-            username, 
+            nickname, 
             msg: msg || "", 
             timestamp, 
             messageId, 
@@ -299,14 +274,14 @@ io.on("connection", (socket) => {
         await saveMessage(messageData);
     });
 
-    socket.on("join room", async (room) => {
-        const username = users.get(socket.id);
-        if (!username) return socket.emit("auth error", "Не авторизован");
+    socket.on("join room", (room) => {
+        const nickname = users.get(socket.id);
+        if (!nickname) return socket.emit("auth error", "Не авторизован");
     
         // Покидаем текущую комнату (если есть)
         const currentRoomValue = currentRoom.get(socket.id) || "room1";
         if (currentRoomValue && channelUsers.has(currentRoomValue)) {
-            channelUsers.get(currentRoomValue).delete(username);
+            channelUsers.get(currentRoomValue).delete(nickname);
         }
     
         // Присоединяемся к новой комнате
@@ -317,25 +292,25 @@ io.on("connection", (socket) => {
         if (!channelUsers.has(room)) {
             channelUsers.set(room, new Set());
         }
-        channelUsers.get(room).add(username);
+        channelUsers.get(room).add(nickname);
     
         // Загружаем историю сообщений для комнаты
         loadChatHistory(socket, room);
     
         // Обновляем пользователей для всех в комнате
         io.to(room).emit("update users", {
-            users: await getAllUsers(),
+            users: getAllUsers(),
             onlineUsers: Array.from(channelUsers.get(room)),
             onlineCount: channelUsers.get(room).size,
-            totalCount: (await getAllUsers()).length,
+            totalCount: getAllUsers().length,
             room: room
         });
     });
 
     socket.on("delete message", async ({ room, messageId }) => {
-        const username = users.get(socket.id);
-        if (!username) return;
-        const permissions = await getUserPermissions(username);
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
+        const permissions = await getUserPermissions(nickname);
         if (permissions.deleteMessages) {
             await pool.query('DELETE FROM messages WHERE message_id = $1 AND room = $2', [messageId, room]);
             io.to(room).emit("message deleted", messageId);
@@ -343,9 +318,9 @@ io.on("connection", (socket) => {
     });
 
     socket.on("clear chat", async (room) => {
-        const username = users.get(socket.id);
-        if (!username) return;
-        const permissions = await getUserPermissions(username);
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
+        const permissions = await getUserPermissions(nickname);
         if (permissions.clearChat) {
             await pool.query('DELETE FROM messages WHERE room = $1', [room]);
             io.to(room).emit("chat cleared");
@@ -353,27 +328,27 @@ io.on("connection", (socket) => {
     });
 
     socket.on("mute user", async ({ room, targetUsername, duration }) => {
-        const username = users.get(socket.id);
-        if (!username) return;
-        const permissions = await getUserPermissions(username);
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
+        const permissions = await getUserPermissions(nickname);
         if (permissions.muteUsers) {
             const targetSocketId = [...users.entries()].find(([_, name]) => name === targetUsername)?.[0];
             if (targetSocketId) {
                 mutedUsers.set(targetSocketId, Date.now() + duration * 1000);
-                io.to(room).emit("user muted", { username: targetUsername, duration });
+                io.to(room).emit("user muted", { nickname: targetUsername, duration });
             }
         }
     });
 
     socket.on("ban user", async ({ room, targetUsername }) => {
-        const username = users.get(socket.id);
-        if (!username) return;
-        const permissions = await getUserPermissions(username);
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
+        const permissions = await getUserPermissions(nickname);
         if (permissions.banUsers) {
             const targetSocketId = [...users.entries()].find(([_, name]) => name === targetUsername)?.[0];
             if (targetSocketId) {
                 users.delete(targetSocketId);
-                await pool.query('DELETE FROM users WHERE username = $1', [targetUsername]);
+                await pool.query('DELETE FROM users WHERE nickname = $1', [targetUsername]);
                 io.to(room).emit("user banned", targetUsername);
                 const allUsers = await getAllUsers();
                 const onlineUsers = Array.from(users.values());
@@ -389,8 +364,8 @@ io.on("connection", (socket) => {
     });
 
     socket.on("typing", (room) => {
-        const username = users.get(socket.id);
-        if (username) socket.to(room).emit("typing", username);
+        const nickname = users.get(socket.id);
+        if (nickname) socket.to(room).emit("typing", nickname);
     });
 
     socket.on("stop typing", (room) => {
@@ -398,14 +373,14 @@ io.on("connection", (socket) => {
     });
 
     socket.on("get profile", async (targetUsername) => {
-        const username = users.get(socket.id);
-        if (!username) return;
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
         const profile = await getUserProfile(targetUsername);
         if (profile) {
-            const permissions = await getUserPermissions(username);
+            const permissions = await getUserPermissions(nickname);
             socket.emit("profile data", { 
                 ...profile, 
-                isOwnProfile: username === targetUsername, 
+                isOwnProfile: nickname === targetUsername, 
                 canAssignGroups: permissions.assignGroups 
             });
         } else {
@@ -414,16 +389,16 @@ io.on("connection", (socket) => {
     });
 
     socket.on("update profile", async ({ avatar, age, bio }) => {
-        const username = users.get(socket.id);
-        if (!username) return;
-        await updateUserProfile(username, { avatar, age, bio });
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
+        await updateUserProfile(nickname, { avatar, age, bio });
         socket.emit("profile updated", "Профиль обновлён");
     });
 
     socket.on("assign group", async ({ targetUsername, role }) => {
-        const username = users.get(socket.id);
-        if (!username) return;
-        const permissions = await getUserPermissions(username);
+        const nickname = users.get(socket.id);
+        if (!nickname) return;
+        const permissions = await getUserPermissions(nickname);
         if (permissions.assignGroups) {
             await assignRole(targetUsername, role.toLowerCase());
             io.emit("group assigned", `${targetUsername} теперь ${role === 'admin' ? 'Администратор' : 'Модератор'}`);
@@ -431,10 +406,10 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", async () => {
-        const username = users.get(socket.id);
-        if (username) {
+        const nickname = users.get(socket.id);
+        if (nickname) {
             users.delete(socket.id);
-            await pool.query('UPDATE users SET last_seen = NOW() WHERE username = $1', [username]);
+            await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [nickname]);
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
