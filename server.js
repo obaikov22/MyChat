@@ -82,8 +82,17 @@ async function saveMessage({ room, nickname, msg, timestamp, messageId, replyTo,
 }
 
 async function loadChatHistory(socket, room) {
-    const result = await pool.query('SELECT * FROM messages WHERE room = $1 ORDER BY timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
-    socket.emit("chat history", result.rows);
+    const result = await pool.query('SELECT m.*, u.nickname FROM messages m LEFT JOIN users u ON m.username = u.nickname WHERE m.room = $1 ORDER BY m.timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
+    socket.emit("chat history", result.rows.map(row => ({
+        username: row.nickname, // Используем nickname вместо username
+        msg: row.msg,
+        timestamp: row.timestamp,
+        messageId: row.message_id,
+        replyTo: row.reply_to,
+        type: row.type,
+        media: row.media,
+        avatar: row.avatar || "/default-avatar.png"
+    })));
 }
 
 async function getUserPermissions(nickname) {
@@ -201,10 +210,10 @@ io.on("connection", (socket) => {
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
-                users: allUsers, 
+                users: await allUsers, 
                 onlineUsers,
                 onlineCount: onlineUsers.length, 
-                totalCount: allUsers.length 
+                totalCount: (await allUsers()).length 
             });
         } else {
             socket.emit("auth error", "Неверный ник или пароль");
@@ -226,10 +235,10 @@ io.on("connection", (socket) => {
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
-                users: allUsers, 
+                users: await allUsers, 
                 onlineUsers,
                 onlineCount: onlineUsers.length, 
-                totalCount: allUsers.length 
+                totalCount: (await allUsers()).length 
             });
         } catch (err) {
             socket.emit("auth error", "Неверный или просроченный токен");
@@ -274,7 +283,7 @@ io.on("connection", (socket) => {
         await saveMessage(messageData);
     });
 
-    socket.on("join room", (room) => {
+    socket.on("join room", async (room) => {
         const nickname = users.get(socket.id);
         if (!nickname) return socket.emit("auth error", "Не авторизован");
     
@@ -299,10 +308,10 @@ io.on("connection", (socket) => {
     
         // Обновляем пользователей для всех в комнате
         io.to(room).emit("update users", {
-            users: getAllUsers(),
+            users: await getAllUsers(), // Убедимся, что это массив
             onlineUsers: Array.from(channelUsers.get(room)),
             onlineCount: channelUsers.get(room).size,
-            totalCount: getAllUsers().length,
+            totalCount: (await getAllUsers()).length,
             room: room
         });
     });
@@ -353,10 +362,10 @@ io.on("connection", (socket) => {
                 const allUsers = await getAllUsers();
                 const onlineUsers = Array.from(users.values());
                 io.emit("update users", { 
-                    users: allUsers, 
+                    users: await allUsers, 
                     onlineUsers,
                     onlineCount: onlineUsers.length, 
-                    totalCount: allUsers.length 
+                    totalCount: (await allUsers()).length 
                 });
                 io.sockets.sockets.get(targetSocketId)?.disconnect();
             }
@@ -413,10 +422,10 @@ io.on("connection", (socket) => {
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
-                users: allUsers, 
+                users: await allUsers, 
                 onlineUsers,
                 onlineCount: onlineUsers.length, 
-                totalCount: allUsers.length 
+                totalCount: (await allUsers()).length 
             });
         }
     });

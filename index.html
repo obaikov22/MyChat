@@ -1575,6 +1575,11 @@
                 return;
             }
 
+            if (!Array.isArray(users)) {
+                console.error("users не является массивом:", users);
+                return;
+            }
+
         // Сортируем пользователей: онлайн вверху, оффлайн внизу
             users.sort((a, b) => {
                 const isAOnline = onlineUsers.includes(a.nickname);
