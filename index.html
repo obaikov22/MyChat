@@ -126,7 +126,7 @@
             border-color: var(--username-color);
             box-shadow: 0 0 5px var(--shadow-color);
         }
-        #nickname-input, #password-input {
+        #username-input, #password-input {
             width: 50%;
             padding: 12px;
             border: none;
@@ -848,7 +848,7 @@
             .auth-container h2 {
                 font-size: 1.5em; /* Увеличил заголовок */
             }
-            #nickname-input, #password-input {
+            #username-input, #password-input {
                 width: 100%;
                 padding: 12px 15px; /* Увеличил для удобства */
                 font-size: 16px; /* Увеличил шрифт */
@@ -925,7 +925,7 @@
 <body>
     <div class="auth-container">
         <h2>Вход / Регистрация</h2>
-        <input id="nickname-input" type="text" placeholder="Твой ник">
+        <input id="username-input" type="text" placeholder="Твой ник">
         <input id="password-input" type="password" placeholder="Пароль">
         <button onclick="auth()">Войти</button> 
         <div id="auth-error"></div>
@@ -973,7 +973,7 @@
             <div class="profile-header">
                 <img id="profile-avatar" src="/default-avatar.png" alt="Avatar">
                 <div class="profile-info">
-                    <h4 id="profile-nickname"></h4>
+                    <h4 id="profile-username"></h4>
                     <p id="profile-age" class="age"></p>
                     <p id="profile-status" class="status"></p>
                 </div>
@@ -1035,7 +1035,7 @@
         const attachButton = document.getElementById("attach-button");
         const fileInput = document.getElementById("file-input");
         const emojiPicker = document.getElementById("emoji-picker");
-        const nicknameInput = document.getElementById("nickname-input");
+        const usernameInput = document.getElementById("username-input");
         const passwordInput = document.getElementById("password-input");
         const chatRoom = document.querySelector(".chat-room");
         const authContainer = document.querySelector(".auth-container");
@@ -1146,17 +1146,17 @@
         });
 
         function auth() { 
-            const nickname = nicknameInput.value.trim();
+            const username = usernameInput.value.trim();
             const password = passwordInput.value.trim();
-            if (nickname && password) {
-                socket.emit("auth", { nickname, password });
+            if (username && password) {
+                socket.emit("auth", { username, password });
             } else {
                 authError.innerText = "Ник и пароль обязательны";
             }
         }
 
-        socket.on("auth success", ({ nickname, token, permissions }) => {
-            username = nickname;
+        socket.on("auth success", ({ username, token, permissions }) => {
+            username = username;
             userPermissions = permissions;
             localStorage.setItem("chatToken", token);
             authContainer.classList.add("hidden");
@@ -1196,7 +1196,7 @@
             userPermissions = {};
             chatRoom.classList.add("hidden");
             authContainer.classList.remove("hidden");
-            nicknameInput.value = "";
+            usernameInput.value = "";
             passwordInput.value = "";
             authError.innerText = "";
             clearChatBtn.classList.add("hidden");
@@ -1577,28 +1577,28 @@
 
         // Сортируем пользователей: онлайн вверху, оффлайн внизу
             users.sort((a, b) => {
-                const isAOnline = onlineUsers.includes(a.nickname);
-                const isBOnline = onlineUsers.includes(b.nickname);
+                const isAOnline = onlineUsers.includes(a.username);
+                const isBOnline = onlineUsers.includes(b.username);
                 return isBOnline - isAOnline; // Онлайн (true = 1) вверху, оффлайн (false = 0) внизу
             });
 
             users.forEach(user => {
-                if (!user || !user.nickname) return;
+                if (!user || !user.username) return;
                 // Проверяем, находится ли пользователь в текущей комнате
-                if (onlineUsers.includes(user.nickname)) {
+                if (onlineUsers.includes(user.username)) {
                     const li = document.createElement("li");
                     const avatarImg = document.createElement("img");
                     avatarImg.src = user.avatar || "/default-avatar.png";
                     avatarImg.className = "user-avatar";
-                    avatarImg.alt = `${user.nickname}'s avatar`;
+                    avatarImg.alt = `${user.username}'s avatar`;
                     const nameSpan = document.createElement("span");
-                    nameSpan.textContent = user.nickname;
+                    nameSpan.textContent = user.username;
                     li.appendChild(avatarImg);
                     li.appendChild(nameSpan);
-                    li.onclick = () => showProfile(user.nickname);
-                    const isOnline = onlineUsers.includes(user.nickname);
+                    li.onclick = () => showProfile(user.username);
+                    const isOnline = onlineUsers.includes(user.username);
                     if (!isOnline) li.classList.add("offline");
-                    if (user.nickname.toLowerCase() === "admin") {
+                    if (user.username.toLowerCase() === "admin") {
                         nameSpan.style.color = isOnline ? "#D32F2F" : "#999";
                     }
                     if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
@@ -1607,7 +1607,7 @@
                             muteIcon.innerHTML = "🔇";
                             muteIcon.className = "admin-icon";
                             muteIcon.title = "Мут";
-                            muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.nickname); };
+                            muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.username); };
                             li.appendChild(muteIcon);
                         }
                         if (userPermissions.banUsers) {
@@ -1615,12 +1615,12 @@
                             banIcon.innerHTML = "🚫";
                             banIcon.className = "admin-icon";
                             banIcon.title = "Бан";
-                            banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.nickname); };
+                            banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.username); };
                             li.appendChild(banIcon);
                         }
                     }
                     usersList.appendChild(li);
-                    avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
+                    avatarCache.set(user.username, user.avatar || "/default-avatar.png");
                 }
             });
             userCount.innerText = `${onlineCount}/${totalCount}`;
@@ -1628,12 +1628,12 @@
 
         socket.on("update users avatars", (users) => {
             users.forEach(user => {
-                if (!user || !user.nickname) return;
-                avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
-                document.querySelectorAll(`.message-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
+                if (!user || !user.username) return;
+                avatarCache.set(user.username, user.avatar || "/default-avatar.png");
+                document.querySelectorAll(`.message-avatar[alt="${user.username}'s avatar"]`).forEach(img => {
                     img.src = user.avatar || "/default-avatar.png";
                 });
-                document.querySelectorAll(`.user-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
+                document.querySelectorAll(`.user-avatar[alt="${user.username}'s avatar"]`).forEach(img => {
                     img.src = user.avatar || "/default-avatar.png";
                 });
             });
@@ -1713,16 +1713,16 @@
             socket.emit("get profile", targetUsername);
         }
 
-        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, role, isOwnProfile, canAssignGroups }) => {
-            if (!nickname) {
+        socket.on("profile data", ({ username, avatar, age, last_seen, bio, achievements, role, isOwnProfile, canAssignGroups }) => {
+            if (!username) {
                 showNotification("Профиль не найден");
                 return;
             }
-            document.getElementById("profile-nickname").textContent = nickname;
+            document.getElementById("profile-username").textContent = username;
             document.getElementById("profile-avatar").src = avatar || "/default-avatar.png";
             document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
             const statusEl = document.getElementById("profile-status");
-            const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));
+            const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(username));
             statusEl.className = "status " + (isOnline ? "online" : "offline");
             statusEl.textContent = isOnline ? "Онлайн" : `Последний раз: ${new Date(last_seen).toLocaleString()}`;
             const achievementsEl = document.getElementById("profile-achievements");
@@ -1799,14 +1799,14 @@
         function assignGroup() {
             const role = document.getElementById("group-select").value;
             if (role) {
-                socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, role });
+                socket.emit("assign group", { targetUsername: document.getElementById("profile-username").textContent, role });
             }
             closeProfileModal();
         }
 
         socket.on("group assigned", (message) => {
             showNotification(message);
-            showProfile(document.getElementById("profile-nickname").textContent);
+            showProfile(document.getElementById("profile-username").textContent);
         });
 
         function cancelGroupForm() {
