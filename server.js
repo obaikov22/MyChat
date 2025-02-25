@@ -16,6 +16,8 @@ const pool = new Pool({
 });
 
 const users = new Map();
+const currentRoom = new Map(); // Хранит комнату для каждого socket.id
+const channelUsers = new Map(); // Хранит пользователей по комнатам: room -> Set(nicknames)
 const mutedUsers = new Map();
 
 pool.connect()
@@ -102,6 +104,11 @@ async function getChatHistory(room) {
         console.error("Ошибка загрузки истории:", err.message);
         return [];
     }
+}
+
+async function loadChatHistory(socket, room) {
+    const result = await pool.query('SELECT * FROM messages WHERE room = $1 ORDER BY timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
+    socket.emit("chat history", result.rows);
 }
 
 async function getUserPermissions(username) {
@@ -288,9 +295,36 @@ io.on("connection", (socket) => {
     });
 
     socket.on("join room", async (room) => {
+        const nickname = users.get(socket.id);
+        if (!nickname) return socket.emit("auth error", "Не авторизован");
+    
+        // Покидаем текущую комнату (если есть)
+        const currentRoomValue = currentRoom.get(socket.id) || "room1";
+        if (currentRoomValue && channelUsers.has(currentRoomValue)) {
+            channelUsers.get(currentRoomValue).delete(nickname);
+        }
+    
+        // Присоединяемся к новой комнате
         socket.join(room);
-        const history = await getChatHistory(room);
-        socket.emit("chat history", history);
+        currentRoom.set(socket.id, room);
+    
+        // Обновляем список пользователей в новой комнате
+        if (!channelUsers.has(room)) {
+            channelUsers.set(room, new Set());
+        }
+        channelUsers.get(room).add(nickname);
+    
+        // Загружаем историю сообщений для комнаты
+        loadChatHistory(socket, room);
+    
+        // Обновляем пользователей для всех в комнате
+        io.to(room).emit("update users", {
+            users: await getAllUsers(),
+            onlineUsers: Array.from(channelUsers.get(room)),
+            onlineCount: channelUsers.get(room).size,
+            totalCount: (await getAllUsers()).length,
+            room: room
+        });
     });
 
     socket.on("delete message", async ({ room, messageId }) => {
