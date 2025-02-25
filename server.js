@@ -5,20 +5,17 @@ const io = require('socket.io')(http, { cors: { origin: "*" } });
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
-const currentRoom = new Map(); // Хранит канал для каждого socket.id
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const MAX_MESSAGES = 100;
 
 const pool = new Pool({
-    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a.oregon-postgres.render.com/chat_9oa7",
+    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7",
     ssl: { rejectUnauthorized: false }
 });
 
 const users = new Map();
-const channelUsers = new Map(); // Хранит пользователей по каналам: channel -> Set(nicknames)
 const mutedUsers = new Map();
 
 pool.connect()
@@ -27,7 +24,6 @@ pool.connect()
 
 app.use(express.static(__dirname));
 
-app.use(cookieParser());
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
@@ -72,18 +68,18 @@ async function verifyUser(nickname, password) {
     }
 }
 
-async function saveMessage({ channel, username, msg, timestamp, messageId, replyTo, type, media }) {
+async function saveMessage({ room, username, msg, timestamp, messageId, replyTo, type, media }) {
     try {
         await pool.query(`
-            INSERT INTO messages (channel, username, msg, timestamp, message_id, reply_to, type, media)
+            INSERT INTO messages (room, username, msg, timestamp, message_id, reply_to, type, media)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [channel, username, msg, timestamp, messageId, replyTo, type, media]);
+            [room, username, msg, timestamp, messageId, replyTo, type, media]);
     } catch (err) {
         console.error("Ошибка сохранения сообщения:", err.message);
     }
 }
 
-async function getChatHistory(channel) {
+async function getChatHistory(room) {
     try {
         const res = await pool.query(`
             SELECT m.*, u.avatar 
@@ -91,7 +87,7 @@ async function getChatHistory(channel) {
             JOIN users u ON m.username = u.nickname
             WHERE m.room = $1 
             ORDER BY m.id ASC 
-            LIMIT ${MAX_MESSAGES}`, [channel]);
+            LIMIT ${MAX_MESSAGES}`, [room]);
         return res.rows.map(row => ({
             username: row.username,
             msg: row.msg,
@@ -106,11 +102,6 @@ async function getChatHistory(channel) {
         console.error("Ошибка загрузки истории:", err.message);
         return [];
     }
-}
-
-async function getUserAvatar(nickname) {
-    const result = await pool.query('SELECT avatar FROM users WHERE nickname = $1', [nickname]);
-    return result.rows[0]?.avatar || "/default-avatar.png";
 }
 
 async function getUserPermissions(username) {
@@ -208,7 +199,7 @@ async function assignRole(targetUsername, role) {
 }
 
 io.on("connection", (socket) => {
-    socket.on("auth", async ({ nickname, password, rememberMe }) => {
+    socket.on("auth", async ({ nickname, password }) => {
         const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
         if (existingSocketId && existingSocketId !== socket.id) {
             users.delete(existingSocketId);
@@ -216,11 +207,9 @@ io.on("connection", (socket) => {
         }
         const isValid = await verifyUser(nickname, password);
         if (isValid) {
-            const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: rememberMe ? '30d' : '1h' });
+            const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: '1h' });
             users.set(socket.id, nickname);
             const permissions = await getUserPermissions(nickname);
-            // Сохраняем токен в cookies
-            socket.handshake.headers.cookie = `chatToken=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=${rememberMe ? 2592000 : 3600}`; // 30 дней или 1 час
             socket.emit("auth success", { nickname, token, permissions });
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
@@ -236,11 +225,6 @@ io.on("connection", (socket) => {
     });
 
     socket.on("auto login", async (token) => {
-        // Если токен не передан, попробуем взять его из cookies
-        if (!token && socket.request.headers.cookie) {
-            const cookies = cookieParser.parse(socket.request.headers.cookie);
-            token = cookies.chatToken;
-        }
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
             const nickname = decoded.nickname;
@@ -265,78 +249,71 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("chat message", async ({ channel, msg, replyTo, media }) => {
-        const nickname = users.get(socket.id);
-        if (!nickname || isMuted(nickname, channel)) return;
-        const messageId = generateMessageId();
-        const timestamp = new Date().toISOString();
-        const avatar = await getUserAvatar(nickname);
-        await pool.query(
-            'INSERT INTO messages (channel, username, msg, timestamp, message_id, reply_to, type, media) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-            [channel, nickname, msg, timestamp, messageId, replyTo, media ? 'media' : 'message', media]
-        );
-        io.to(channel).emit("chat message", { username: nickname, msg, timestamp, messageId, replyTo, media, type: media ? 'media' : 'message', avatar });
+    socket.on("chat message", async ({ room, msg, replyTo, media }) => {
+        const username = users.get(socket.id);
+        if (!username) return;
+        const isMuted = mutedUsers.has(socket.id) && mutedUsers.get(socket.id) > Date.now();
+        if (isMuted) {
+            socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
+            return;
+        }
+        const timestamp = new Date().toLocaleTimeString();
+        const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
+        const permissions = await getUserPermissions(username);
+        const userProfile = await getUserProfile(username);
+        const messageData = { 
+            room, 
+            username, 
+            msg: msg || "", 
+            timestamp, 
+            messageId, 
+            replyTo, 
+            type: "message",
+            media,
+            avatar: userProfile.avatar
+        };
+        if (permissions.assignGroups && msg.startsWith("/add ")) {
+            const announcement = msg.slice(5).trim();
+            if (announcement) {
+                messageData.msg = announcement;
+                messageData.type = "announcement";
+                messageData.media = null;
+                io.to(room).emit("announcement", messageData);
+                await saveMessage(messageData);
+            }
+            return;
+        }
+        io.to(room).emit("chat message", messageData);
+        await saveMessage(messageData);
     });
 
-    socket.on("join room", async (channel) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return socket.emit("auth error", "Не авторизован");
-    
-        // Покидаем текущий канал (если есть)
-        const currentChannel = currentRoom.get(socket.id) || "room1";
-        if (currentChannel && channelUsers.has(currentChannel)) {
-            channelUsers.get(currentChannel).delete(nickname);
-        }
-    
-        // Присоединяемся к новому каналу
-        socket.join(channel);
-        currentRoom.set(socket.id, channel);
-    
-        // Обновляем список пользователей в новом канале
-        if (!channelUsers.has(channel)) {
-            channelUsers.set(channel, new Set());
-        }
-        channelUsers.get(channel).add(nickname);
-    
-        // Загружаем историю сообщений для канала
-        loadChatHistory(socket, channel);
-    
-        // Обновляем пользователей для всех в канале
-        io.to(channel).emit("update users", {
-            users: await getAllUsers(),
-            onlineUsers: Array.from(channelUsers.get(channel)),
-            onlineCount: channelUsers.get(channel).size,
-            totalCount: (await getAllUsers()).length,
-            channel: channel
-        });
+    socket.on("join room", async (room) => {
+        socket.join(room);
+        const history = await getChatHistory(room);
+        socket.emit("chat history", history);
     });
 
-    async function loadChatHistory(socket, channel) {
-        const result = await pool.query('SELECT * FROM messages WHERE channel = $1 ORDER BY timestamp ASC LIMIT $2', [channel, MAX_MESSAGES]);
-        socket.emit("chat history", result.rows);
-    }
-
-    socket.on("delete message", async ({ channel, messageId }) => {
+    socket.on("delete message", async ({ room, messageId }) => {
         const username = users.get(socket.id);
         if (!username) return;
         const permissions = await getUserPermissions(username);
         if (permissions.deleteMessages) {
-            await pool.query('DELETE FROM messages WHERE message_id = $1 AND channel = $2', [messageId, channel]);
-            io.to(channel).emit("message deleted", messageId);
+            await pool.query('DELETE FROM messages WHERE message_id = $1 AND room = $2', [messageId, room]);
+            io.to(room).emit("message deleted", messageId);
         }
     });
 
-    socket.on("clear chat", async (channel) => {
+    socket.on("clear chat", async (room) => {
         const username = users.get(socket.id);
         if (!username) return;
         const permissions = await getUserPermissions(username);
         if (permissions.clearChat) {
-            await pool.query('DELETE FROM messages WHERE room = $1', [channel]);
-            io.to(channel).emit("chat cleared");
+            await pool.query('DELETE FROM messages WHERE room = $1', [room]);
+            io.to(room).emit("chat cleared");
         }
     });
 
-    socket.on("mute user", async ({ channel, targetUsername, duration }) => {
+    socket.on("mute user", async ({ room, targetUsername, duration }) => {
         const username = users.get(socket.id);
         if (!username) return;
         const permissions = await getUserPermissions(username);
@@ -344,12 +321,12 @@ io.on("connection", (socket) => {
             const targetSocketId = [...users.entries()].find(([_, name]) => name === targetUsername)?.[0];
             if (targetSocketId) {
                 mutedUsers.set(targetSocketId, Date.now() + duration * 1000);
-                io.to(channel).emit("user muted", { username: targetUsername, duration });
+                io.to(room).emit("user muted", { username: targetUsername, duration });
             }
         }
     });
 
-    socket.on("ban user", async ({ channel, targetUsername }) => {
+    socket.on("ban user", async ({ room, targetUsername }) => {
         const username = users.get(socket.id);
         if (!username) return;
         const permissions = await getUserPermissions(username);
@@ -358,7 +335,7 @@ io.on("connection", (socket) => {
             if (targetSocketId) {
                 users.delete(targetSocketId);
                 await pool.query('DELETE FROM users WHERE nickname = $1', [targetUsername]);
-                io.to(channel).emit("user banned", targetUsername);
+                io.to(room).emit("user banned", targetUsername);
                 const allUsers = await getAllUsers();
                 const onlineUsers = Array.from(users.values());
                 io.emit("update users", { 
@@ -372,13 +349,13 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("typing", (channel) => {
+    socket.on("typing", (room) => {
         const username = users.get(socket.id);
-        if (username) socket.to(channel).emit("typing", username);
+        if (username) socket.to(room).emit("typing", username);
     });
 
-    socket.on("stop typing", (channel) => {
-        socket.to(channel).emit("stop typing");
+    socket.on("stop typing", (room) => {
+        socket.to(room).emit("stop typing");
     });
 
     socket.on("get profile", async (targetUsername) => {
@@ -415,10 +392,10 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", async () => {
-        const nickname = users.get(socket.id);
-        if (nickname) {
+        const username = users.get(socket.id);
+        if (username) {
             users.delete(socket.id);
-            await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [nickname]);
+            await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [username]);
             const allUsers = await getAllUsers();
             const onlineUsers = Array.from(users.values());
             io.emit("update users", { 
@@ -427,10 +404,6 @@ io.on("connection", (socket) => {
                 onlineCount: onlineUsers.length, 
                 totalCount: allUsers.length 
             });
-        }
-        // Очищаем cookies при отключении
-        if (socket.request.headers.cookie) {
-            socket.handshake.headers.cookie = `chatToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict`;
         }
     });
 });
