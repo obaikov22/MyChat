@@ -13,7 +13,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const MAX_MESSAGES = 100;
 
 const pool = new Pool({
-    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7",
+    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a.oregon-postgres.render.com/chat_9oa7",
     ssl: { rejectUnauthorized: false }
 });
 
