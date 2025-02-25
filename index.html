@@ -913,8 +913,9 @@ emoji-picker {
         border-radius: 15px;
     }
 }
-</style><div class="auth-container"><h2>Вход / Регистрация</h2><input id="nickname-input" placeholder="Твой ник"> <input id="password-input" type="password" placeholder="Пароль"> <label><input type="checkbox" id="remember-me"> Запомнить меня</label> <button onclick="auth()">Войти</button><div id="auth-error"></div></div><div class="chat-room hidden"><div class="chat-container"><div class="top-bar"><select id="room-select" onchange="joinRoom()"><option value="room1">Комната 1<option value="room2">Комната 2</select> <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">👤</button></div><div id="messages"><div id="new-messages-divider"><span>Новые сообщения</span></div></div><div class="input-container"><input id="message-input" placeholder="Напиши сообщение..."> <button id="emoji-button">😊</button> <button id="attach-button">📎</button> <input id="file-input" type="file" accept="image/*,video/*,audio/*" style="display: none;"> <button onclick="sendMessage()">➤</button> <button id="cancel-reply-btn" class="hidden" onclick="cancelReply()">✖</button><div id="upload-progress"><div id="upload-progress-bar"></div></div><div id="new-messages-count">0</div></div><div id="typing-status"></div><emoji-picker id="emoji-picker"></emoji-picker></div><div class="users-panel"><button id="close-users-btn" class="admin-btn" onclick="toggleUsersPanel()">Скрыть</button><h3>Пользователи <span id="user-count">0/0</span></h3><ul id="users-list"></ul><div class="admin-controls"><button class="admin-btn hidden" id="clear-chat-btn" onclick="clearChat()">Очистить чат</button> <button class="admin-btn" onclick="logout()">Выйти</button> <button class="admin-btn" id="theme-toggle-btn" onclick="toggleTheme()">Тёмная тема</button></div></div></div><div id="profile-modal" class="modal"><div class="modal-content"><button class="close-btn" onclick="closeProfileModal()">✖</button><div class="profile-header"><img id="profile-avatar" src="/default-avatar.png" alt="Avatar"><div class="profile-info"><h4 id="profile-nickname"></h4><p id="profile-age" class="age"><p id="profile-status" class="status"></div></div><div id="profile-achievements" class="achievements"></div><div id="profile-bio" class="bio"></div><button id="edit-profile-btn" class="admin-btn hidden" onclick="showEditForm()">Редактировать</button><div id="edit-form" class="edit-form"><input type="file" id="edit-avatar" accept="image/*"> <input type="number" id="edit-age" placeholder="Возраст (опционально)" min="1" max="150"> <textarea id="edit-bio" placeholder="Подпись"></textarea> <button onclick="saveProfile()">Сохранить</button> <button onclick="cancelEdit()">Отмена</button></div><div id="group-form" class="group-form"><select id="group-select"><option value="">Выберите роль<option value="admin">Администратор<option value="moderator">Модератор</select> <button onclick="assignGroup()">Назначить</button> <button onclick="cancelGroupForm()">Отмена</button></div><button id="assign-group-btn" class="admin-btn hidden" onclick="showGroupForm()">Назначить роль</button></div></div><div id="image-modal" class="image-modal"><div class="image-modal-content"><button class="close-btn" onclick="closeImageModal()">✖</button> <img id="full-image" src="" alt="Full-size image"></div></div><div id="preview-modal" class="preview-modal"><div class="preview-modal-content"><button class="close-btn" onclick="closePreviewModal()">✖</button><div id="preview-content"></div><div class="preview-buttons"><button onclick="confirmSendMedia()">Отправить</button> <button style="background: var(--delete-btn-bg);" onclick="closePreviewModal()">Отмена</button></div></div></div><div id="notification"></div><script src="/socket.io/socket.io.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.2.1/compressor.min.js"></script><script src="https://unpkg.com/emoji-picker-element@latest/index.js" type="module"></script>
+</style><div class="auth-container hidden"><h2>Вход / Регистрация</h2><input id="nickname-input" placeholder="Твой ник"> <input id="password-input" type="password" placeholder="Пароль"> <label><input type="checkbox" id="remember-me"> Запомнить меня</label> <button onclick="auth()">Войти</button><div id="auth-error"></div></div><div class="chat-room hidden"><div class="chat-container"><div class="top-bar"><select id="room-select" onchange="joinRoom()"><option value="room1">Комната 1<option value="room2">Комната 2</select> <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">👤</button></div><div id="messages"><div id="new-messages-divider"><span>Новые сообщения</span></div></div><div class="input-container"><input id="message-input" placeholder="Напиши сообщение..."> <button id="emoji-button">😊</button> <button id="attach-button">📎</button> <input id="file-input" type="file" accept="image/*,video/*,audio/*" style="display: none;"> <button onclick="sendMessage()">➤</button> <button id="cancel-reply-btn" class="hidden" onclick="cancelReply()">✖</button><div id="upload-progress"><div id="upload-progress-bar"></div></div><div id="new-messages-count">0</div></div><div id="typing-status"></div><emoji-picker id="emoji-picker"></emoji-picker></div><div class="users-panel"><button id="close-users-btn" class="admin-btn" onclick="toggleUsersPanel()">Скрыть</button><h3>Пользователи <span id="user-count">0/0</span></h3><ul id="users-list"></ul><div class="admin-controls"><button class="admin-btn hidden" id="clear-chat-btn" onclick="clearChat()">Очистить чат</button> <button class="admin-btn" onclick="logout()">Выйти</button> <button class="admin-btn" id="theme-toggle-btn" onclick="toggleTheme()">Тёмная тема</button></div></div></div><div id="profile-modal" class="modal"><div class="modal-content"><button class="close-btn" onclick="closeProfileModal()">✖</button><div class="profile-header"><img id="profile-avatar" src="/default-avatar.png" alt="Avatar"><div class="profile-info"><h4 id="profile-nickname"></h4><p id="profile-age" class="age"><p id="profile-status" class="status"></div></div><div id="profile-achievements" class="achievements"></div><div id="profile-bio" class="bio"></div><button id="edit-profile-btn" class="admin-btn hidden" onclick="showEditForm()">Редактировать</button><div id="edit-form" class="edit-form"><input type="file" id="edit-avatar" accept="image/*"> <input type="number" id="edit-age" placeholder="Возраст (опционально)" min="1" max="150"> <textarea id="edit-bio" placeholder="Подпись"></textarea> <button onclick="saveProfile()">Сохранить</button> <button onclick="cancelEdit()">Отмена</button></div><div id="group-form" class="group-form"><select id="group-select"><option value="">Выберите роль<option value="admin">Администратор<option value="moderator">Модератор</select> <button onclick="assignGroup()">Назначить</button> <button onclick="cancelGroupForm()">Отмена</button></div><button id="assign-group-btn" class="admin-btn hidden" onclick="showGroupForm()">Назначить роль</button></div></div><div id="image-modal" class="image-modal"><div class="image-modal-content"><button class="close-btn" onclick="closeImageModal()">✖</button> <img id="full-image" src="" alt="Full-size image"></div></div><div id="preview-modal" class="preview-modal"><div class="preview-modal-content"><button class="close-btn" onclick="closePreviewModal()">✖</button><div id="preview-content"></div><div class="preview-buttons"><button onclick="confirmSendMedia()">Отправить</button> <button style="background: var(--delete-btn-bg);" onclick="closePreviewModal()">Отмена</button></div></div></div><div id="notification"></div><script src="/socket.io/socket.io.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.2.1/compressor.min.js"></script><script src="https://unpkg.com/emoji-picker-element@latest/index.js" type="module"></script>
 <script>
+document.addEventListener('DOMContentLoaded', function() {
     const socket = io();
     let currentRoom = "room1";
     let username = "";
@@ -990,6 +991,124 @@ emoji-picker {
     // Инициализация с проверкой cookies
     checkAuthFromCookies();
 
+    socket.on("auth success", ({ nickname, token, permissions }) => {
+        username = nickname;
+        userPermissions = permissions;
+        localStorage.setItem("chatToken", token); // Сохраняем в localStorage для обратной совместимости
+        document.cookie = `chatToken=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`; // 30 дней
+        authContainer.classList.add("hidden");
+        chatRoom.classList.remove("hidden");
+        if (userPermissions.clearChat) {
+            clearChatBtn.classList.remove("hidden");
+        }
+        joinRoom();
+    });
+
+    socket.on("auth error", (message) => {
+        authError.innerText = message;
+        showNotification(message);
+        localStorage.removeItem("chatToken");
+        document.cookie = "chatToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict"; // Очищаем cookies
+        authContainer.classList.remove("hidden");
+        chatRoom.classList.add("hidden");
+    });
+
+    function startTitleBlink() {
+        if (!titleBlinkInterval) {
+            titleBlinkInterval = setInterval(() => {
+                document.title = document.title === "Мой чат" ? "Новое сообщение" : "Мой чат";
+            }, 1500);
+        }
+    }
+
+    function joinRoom() {
+        currentRoom = document.getElementById("room-select").value;
+        socket.emit("join room", currentRoom);
+        document.getElementById("messages").innerHTML = "";
+        usersPanel.classList.remove("active");
+        newMessages = 0;
+        newMessagesCount.style.display = "none";
+        stopTitleBlink();
+        lastReadMessageId = null;
+        hideNewMessagesDivider();
+    }
+
+    function showPreview(file) {
+        currentFile = file;
+        const fileUrl = URL.createObjectURL(file);
+        previewContent.innerHTML = "";
+        if (file.type.startsWith("image/")) {
+            const img = document.createElement("img");
+            img.src = fileUrl;
+            img.style.maxWidth = "100%";
+            img.style.maxHeight = "80vh";
+            previewContent.appendChild(img);
+        } else if (file.type.startsWith("video/")) {
+            const video = document.createElement("video");
+            video.src = fileUrl;
+            video.controls = true;
+            video.style.maxWidth = "100%";
+            video.style.maxHeight = "80vh";
+            previewContent.appendChild(video);
+        }
+        previewModal.style.display = "flex";
+        if (window.innerWidth <= 768) {
+            previewModal.style.alignItems = "flex-start";
+            previewModal.style.paddingTop = "20px";
+        }
+    }
+
+    function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
+        const isAdmin = msgUsername?.toLowerCase() === "admin";
+        const replyContent = replyTo ? `
+            <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
+                ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
+                <span class="reply-text">${
+                    document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || 
+                    (document.querySelector(`[data-message-id="${replyTo}"] .media-container`) ? "[Медиа]" : "Сообщение удалено")
+                }</span>
+            </div>
+        ` : "";
+        let mediaContent = "";
+        if (media) {
+            if (media.match(/\.(jpeg|jpg|png|gif)$/i)) {
+                mediaContent = `<div class="media-container"><img src="${media}" alt="Attached image" onclick="showImageModal('${media}')"></div>`;
+            } else if (media.match(/\.(mp4|webm)$/i)) {
+                mediaContent = `<div class="media-container"><video controls src="${media}"></video></div>`;
+            } else if (media.match(/\.(mp3|wav)$/i)) {
+                mediaContent = `<div class="media-container"><audio controls src="${media}"></audio></div>`;
+            }
+        }
+        avatarCache.set(msgUsername, avatar || "/default-avatar.png");
+        return type === "announcement" ? `
+            <div class="announcement" data-message-id="${messageId}">
+                <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                <div class="message-content">
+                    ${replyContent}
+                    <span class="username">${msgUsername} [Объявление]</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${mediaContent}
+                    ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            </div>
+        ` : `
+            <div class="message" data-message-id="${messageId}">
+                <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                <div class="message-content">
+                    ${replyContent}
+                    <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                    <span class="timestamp">${timestamp}</span>
+                    <p>${msg}</p>
+                    ${mediaContent}
+                    ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
+                </div>
+            </div>
+        `;
+    }
+
     function toggleTheme() {
         document.body.classList.toggle("dark-theme");
         if (document.body.classList.contains("dark-theme")) {
@@ -1003,14 +1122,6 @@ emoji-picker {
 
     function toggleUsersPanel() {
         usersPanel.classList.toggle("active");
-    }
-
-    function startTitleBlink() {
-        if (!titleBlinkInterval) {
-            titleBlinkInterval = setInterval(() => {
-                document.title = document.title === "Мой чат" ? "Новое сообщение" : "Мой чат";
-            }, 1500);
-        }
     }
 
     function stopTitleBlink() {
@@ -1071,44 +1182,11 @@ emoji-picker {
             authError.innerText = "Ник и пароль обязательны";
         }
     }
-
-    socket.on("auth success", ({ nickname, token, permissions }) => {
-        username = nickname;
-        userPermissions = permissions;
-        localStorage.setItem("chatToken", token); // Сохраняем в localStorage для обратной совместимости
-        document.cookie = `chatToken=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`; // 30 дней
-        authContainer.classList.add("hidden");
-        chatRoom.classList.remove("hidden");
-        if (userPermissions.clearChat) {
-            clearChatBtn.classList.remove("hidden");
-        }
-        joinRoom();
-    });
-
-    socket.on("auth error", (message) => {
-        authError.innerText = message;
-        showNotification(message);
-        localStorage.removeItem("chatToken");
-        document.cookie = "chatToken=; Max-Age=0; HttpOnly; Secure; SameSite=Strict"; // Очищаем cookies
-        authContainer.classList.remove("hidden");
-        chatRoom.classList.add("hidden");
-    });
+});
 
     socket.on("muted", (message) => {
         showNotification(message);
     });
-
-    function joinRoom() {
-        currentRoom = document.getElementById("room-select").value;
-        socket.emit("join room", currentRoom);
-        document.getElementById("messages").innerHTML = "";
-        usersPanel.classList.remove("active");
-        newMessages = 0;
-        newMessagesCount.style.display = "none";
-        stopTitleBlink();
-        lastReadMessageId = null;
-        hideNewMessagesDivider();
-    }
 
     function logout() {
         socket.disconnect();
@@ -1189,31 +1267,6 @@ emoji-picker {
 
             xhr.send(formData);
         });
-    }
-
-    function showPreview(file) {
-        currentFile = file;
-        const fileUrl = URL.createObjectURL(file);
-        previewContent.innerHTML = "";
-        if (file.type.startsWith("image/")) {
-            const img = document.createElement("img");
-            img.src = fileUrl;
-            img.style.maxWidth = "100%";
-            img.style.maxHeight = "80vh";
-            previewContent.appendChild(img);
-        } else if (file.type.startsWith("video/")) {
-            const video = document.createElement("video");
-            video.src = fileUrl;
-            video.controls = true;
-            video.style.maxWidth = "100%";
-            video.style.maxHeight = "80vh";
-            previewContent.appendChild(video);
-        }
-        previewModal.style.display = "flex";
-        if (window.innerWidth <= 768) {
-            previewModal.style.alignItems = "flex-start";
-            previewModal.style.paddingTop = "20px";
-        }
     }
 
     function closePreviewModal() {
@@ -1300,16 +1353,6 @@ emoji-picker {
         }
     }
 
-    function deleteMessage(messageId) {
-        socket.emit("delete message", { room: currentRoom, messageId });
-    }
-
-    function clearChat() {
-        if (confirm("Очистить чат?")) {
-            socket.emit("clear chat", currentRoom);
-        }
-    }
-
     function muteUser(targetUsername) {
         if (username === targetUsername) return;
         const duration = prompt(`На сколько секунд замутить ${targetUsername}? (например, 60)`);
@@ -1335,56 +1378,6 @@ emoji-picker {
         fullImage.src = "";
     }
 
-    function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
-        const isAdmin = msgUsername?.toLowerCase() === "admin";
-        const replyContent = replyTo ? `
-            <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
-                ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
-                <span class="reply-text">${
-                    document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || 
-                    (document.querySelector(`[data-message-id="${replyTo}"] .media-container`) ? "[Медиа]" : "Сообщение удалено")
-                }</span>
-            </div>
-        ` : "";
-        let mediaContent = "";
-        if (media) {
-            if (media.match(/\.(jpeg|jpg|png|gif)$/i)) {
-                mediaContent = `<div class="media-container"><img src="${media}" alt="Attached image" onclick="showImageModal('${media}')"></div>`;
-            } else if (media.match(/\.(mp4|webm)$/i)) {
-                mediaContent = `<div class="media-container"><video controls src="${media}"></video></div>`;
-            } else if (media.match(/\.(mp3|wav)$/i)) {
-                mediaContent = `<div class="media-container"><audio controls src="${media}"></audio></div>`;
-            }
-        }
-        avatarCache.set(msgUsername, avatar || "/default-avatar.png");
-        return type === "announcement" ? `
-            <div class="announcement" data-message-id="${messageId}">
-                <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
-                <div class="message-content">
-                    ${replyContent}
-                    <span class="username">${msgUsername} [Объявление]</span>
-                    <span class="timestamp">${timestamp}</span>
-                    <p>${msg}</p>
-                    ${mediaContent}
-                    ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                </div>
-            </div>
-        ` : `
-            <div class="message" data-message-id="${messageId}">
-                <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
-                <div class="message-content">
-                    ${replyContent}
-                    <span class="username ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
-                    <span class="timestamp">${timestamp}</span>
-                    <p>${msg}</p>
-                    ${mediaContent}
-                    ${userPermissions.deleteMessages ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')">Удалить</button>` : ''}
-                    <button class="reply-btn" onclick="replyToMessage('${messageId}')">Ответить</button>
-                </div>
-            </div>
-        `;
-    }
 
     socket.on("chat history", (history) => {
         let messages = document.getElementById("messages");
