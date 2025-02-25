@@ -1013,12 +1013,61 @@ document.addEventListener('DOMContentLoaded', function() {
         chatRoom.classList.add("hidden");
     });
 
+    function scrollToMessage(messageId) {
+        const message = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (message) {
+            message.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }
+
     function startTitleBlink() {
         if (!titleBlinkInterval) {
             titleBlinkInterval = setInterval(() => {
                 document.title = document.title === "Мой чат" ? "Новое сообщение" : "Мой чат";
             }, 1500);
         }
+    }
+
+    function stopTitleBlink() {
+        if (titleBlinkInterval) {
+            clearInterval(titleBlinkInterval);
+            titleBlinkInterval = null;
+            document.title = "Мой чат";
+        }
+    }
+
+    function cancelReply() {
+        replyingTo = null;
+        messageInput.placeholder = "Напиши сообщение...";
+        cancelReplyBtn.classList.add("hidden");
+    }
+
+    async function confirmSendMedia() {
+        if (!currentFile) return;
+        try {
+            const mediaUrl = await uploadToImgBB(currentFile);
+            if (mediaUrl) {
+                socket.emit("chat message", { 
+                    room: currentRoom, 
+                    msg: messageInput.value.trim(), 
+                    replyTo: replyingTo, 
+                    media: mediaUrl 
+                });
+                messageInput.value = "";
+                replyingTo = null;
+                messageInput.placeholder = "Напиши сообщение...";
+                cancelReplyBtn.classList.add("hidden");
+            }
+        } catch (error) {
+            console.error("Ошибка в confirmSendMedia:", error);
+            showNotification("Не удалось загрузить изображение");
+        }
+        closePreviewModal();
+    }
+
+    function showImageModal(src) {
+        fullImage.src = src;
+        imageModal.style.display = "flex";
     }
 
     function joinRoom() {
@@ -1031,6 +1080,145 @@ document.addEventListener('DOMContentLoaded', function() {
         stopTitleBlink();
         lastReadMessageId = null;
         hideNewMessagesDivider();
+    }
+
+    function logout() {
+        socket.disconnect();
+        localStorage.removeItem("chatToken");
+        username = "";
+        userPermissions = {};
+        chatRoom.classList.add("hidden");
+        authContainer.classList.remove("hidden");
+        nicknameInput.value = "";
+        passwordInput.value = "";
+        authError.innerText = "";
+        clearChatBtn.classList.add("hidden");
+        socket.connect();
+        stopTitleBlink();
+        hideNewMessagesDivider();
+    }
+
+    function showProfile(targetUsername) {
+        socket.emit("get profile", targetUsername);
+    }
+
+    function showEditForm() {
+        document.getElementById("edit-form").style.display = "block";
+        document.getElementById("edit-age").value = document.getElementById("profile-age").textContent.replace("Возраст: ", "") || "";
+        document.getElementById("edit-bio").value = document.getElementById("profile-bio").textContent === "Нет подписи" ? "" : document.getElementById("profile-bio").textContent;
+    }
+
+    function saveProfile() {
+        const avatarFile = document.getElementById("edit-avatar").files[0];
+        const age = document.getElementById("edit-age").value;
+        const bio = document.getElementById("edit-bio").value;
+
+        if (avatarFile) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                socket.emit("update profile", { avatar: reader.result, age: age || null, bio });
+            };
+            reader.readAsDataURL(avatarFile);
+        } else {
+            socket.emit("update profile", { avatar: null, age: age || null, bio });
+        }
+        closeProfileModal();
+    }
+
+    function cancelGroupForm() {
+        document.getElementById("group-form").style.display = "none";
+    }   
+
+    function showGroupForm() {
+        document.getElementById("group-form").style.display = "block";
+    }
+
+    function assignGroup() {
+        const role = document.getElementById("group-select").value;
+        if (role) {
+            socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, role });
+        }
+        closeProfileModal();
+    }
+
+    function compressImage(file) {
+        return new Promise((resolve, reject) => {
+            new Compressor(file, {
+                quality: 0.8,
+                maxWidth: 1024,
+                maxHeight: 1024,
+                mimeType: 'image/jpeg',
+                success(result) {
+                    resolve(result);
+                },
+                error(err) {
+                    console.error("Ошибка сжатия:", err);
+                    reject(err);
+                }
+            });
+        });
+    }
+
+    function closeImageModal() {
+        imageModal.style.display = "none";
+        fullImage.src = "";
+    }
+
+    function closeProfileModal() {
+        profileModal.style.display = "none";
+        document.getElementById("edit-form").style.display = "none";
+        document.getElementById("group-form").style.display = "none";
+    }
+
+    async function uploadToImgBB(file) {
+        let fileToUpload = file;
+        if (file.type.startsWith("image/")) {
+            fileToUpload = await compressImage(file);
+        }
+
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append("image", fileToUpload);
+            formData.append("key", IMGBB_API_KEY);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "https://api.imgbb.com/1/upload", true);
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = (event.loaded / event.total) * 100;
+                    uploadProgressBar.style.width = `${percent}%`;
+                    uploadProgress.style.display = "block";
+                }
+            };
+
+            xhr.onload = () => {
+                uploadProgress.style.display = "none";
+                uploadProgressBar.style.width = "0%";
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        resolve(data.data.url);
+                    } else {
+                        reject(new Error(data.error.message));
+                    }
+                } else {
+                    reject(new Error("Ошибка загрузки: " + xhr.status));
+                }
+            };
+
+            xhr.onerror = () => {
+                uploadProgress.style.display = "none";
+                uploadProgressBar.style.width = "0%";
+                reject(new Error("Ошибка сети при загрузке"));
+            };
+
+            xhr.send(formData);
+        });
+    }
+
+    function cancelEdit() {
+        document.getElementById("edit-form").style.display = "none";
     }
 
     function showPreview(file) {
@@ -1056,6 +1244,14 @@ document.addEventListener('DOMContentLoaded', function() {
             previewModal.style.alignItems = "flex-start";
             previewModal.style.paddingTop = "20px";
         }
+    }
+
+    function closePreviewModal() {
+        previewModal.style.display = "none";
+        URL.revokeObjectURL(previewContent.querySelector("img, video")?.src);
+        previewContent.innerHTML = "";
+        currentFile = null;
+        fileInput.value = "";
     }
 
     function renderMessage({ type, username: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
@@ -1109,29 +1305,6 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
 
-    function toggleTheme() {
-        document.body.classList.toggle("dark-theme");
-        if (document.body.classList.contains("dark-theme")) {
-            localStorage.setItem("theme", "dark");
-            themeToggleBtn.textContent = "Светлая тема";
-        } else {
-            localStorage.setItem("theme", "light");
-            themeToggleBtn.textContent = "Тёмная тема";
-        }
-    }
-
-    function toggleUsersPanel() {
-        usersPanel.classList.toggle("active");
-    }
-
-    function stopTitleBlink() {
-        if (titleBlinkInterval) {
-            clearInterval(titleBlinkInterval);
-            titleBlinkInterval = null;
-            document.title = "Мой чат";
-        }
-    }
-
     function hideNewMessagesDivider() {
         if (newMessagesDivider.style.display === "block") {
             newMessagesDivider.style.transition = "opacity 0.5s ease";
@@ -1171,134 +1344,37 @@ document.addEventListener('DOMContentLoaded', function() {
             auth();
         }
     });
+});
 
     function auth() { 
-        const nickname = nicknameInput.value.trim();
-        const password = passwordInput.value.trim();
-        const rememberMe = document.getElementById("remember-me").checked;
-        if (nickname && password) {
-            socket.emit("auth", { nickname, password, rememberMe });
+            const nickname = nicknameInput.value.trim();
+            const password = passwordInput.value.trim();
+            const rememberMe = document.getElementById("remember-me").checked;
+            if (nickname && password) {
+                socket.emit("auth", { nickname, password, rememberMe });
+            } else {
+                authError.innerText = "Ник и пароль обязательны";
+            }
+        }
+
+    function toggleTheme() {
+        document.body.classList.toggle("dark-theme");
+        if (document.body.classList.contains("dark-theme")) {
+            localStorage.setItem("theme", "dark");
+            themeToggleBtn.textContent = "Светлая тема";
         } else {
-            authError.innerText = "Ник и пароль обязательны";
+            localStorage.setItem("theme", "light");
+            themeToggleBtn.textContent = "Тёмная тема";
         }
     }
-});
+
+    function toggleUsersPanel() {
+        usersPanel.classList.toggle("active");
+    }
 
     socket.on("muted", (message) => {
         showNotification(message);
     });
-
-    function logout() {
-        socket.disconnect();
-        localStorage.removeItem("chatToken");
-        username = "";
-        userPermissions = {};
-        chatRoom.classList.add("hidden");
-        authContainer.classList.remove("hidden");
-        nicknameInput.value = "";
-        passwordInput.value = "";
-        authError.innerText = "";
-        clearChatBtn.classList.add("hidden");
-        socket.connect();
-        stopTitleBlink();
-        hideNewMessagesDivider();
-    }
-
-    function compressImage(file) {
-        return new Promise((resolve, reject) => {
-            new Compressor(file, {
-                quality: 0.8,
-                maxWidth: 1024,
-                maxHeight: 1024,
-                mimeType: 'image/jpeg',
-                success(result) {
-                    resolve(result);
-                },
-                error(err) {
-                    console.error("Ошибка сжатия:", err);
-                    reject(err);
-                }
-            });
-        });
-    }
-
-    async function uploadToImgBB(file) {
-        let fileToUpload = file;
-        if (file.type.startsWith("image/")) {
-            fileToUpload = await compressImage(file);
-        }
-
-        return new Promise((resolve, reject) => {
-            const formData = new FormData();
-            formData.append("image", fileToUpload);
-            formData.append("key", IMGBB_API_KEY);
-
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", "https://api.imgbb.com/1/upload", true);
-
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percent = (event.loaded / event.total) * 100;
-                    uploadProgressBar.style.width = `${percent}%`;
-                    uploadProgress.style.display = "block";
-                }
-            };
-
-            xhr.onload = () => {
-                uploadProgress.style.display = "none";
-                uploadProgressBar.style.width = "0%";
-                if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
-                    if (data.success) {
-                        resolve(data.data.url);
-                    } else {
-                        reject(new Error(data.error.message));
-                    }
-                } else {
-                    reject(new Error("Ошибка загрузки: " + xhr.status));
-                }
-            };
-
-            xhr.onerror = () => {
-                uploadProgress.style.display = "none";
-                uploadProgressBar.style.width = "0%";
-                reject(new Error("Ошибка сети при загрузке"));
-            };
-
-            xhr.send(formData);
-        });
-    }
-
-    function closePreviewModal() {
-        previewModal.style.display = "none";
-        URL.revokeObjectURL(previewContent.querySelector("img, video")?.src);
-        previewContent.innerHTML = "";
-        currentFile = null;
-        fileInput.value = "";
-    }
-
-    async function confirmSendMedia() {
-        if (!currentFile) return;
-        try {
-            const mediaUrl = await uploadToImgBB(currentFile);
-            if (mediaUrl) {
-                socket.emit("chat message", { 
-                    room: currentRoom, 
-                    msg: messageInput.value.trim(), 
-                    replyTo: replyingTo, 
-                    media: mediaUrl 
-                });
-                messageInput.value = "";
-                replyingTo = null;
-                messageInput.placeholder = "Напиши сообщение...";
-                cancelReplyBtn.classList.add("hidden");
-            }
-        } catch (error) {
-            console.error("Ошибка в confirmSendMedia:", error);
-            showNotification("Не удалось загрузить изображение");
-        }
-        closePreviewModal();
-    }
 
     function sendMessage() {
         const msg = messageInput.value.trim();
@@ -1340,19 +1416,6 @@ document.addEventListener('DOMContentLoaded', function() {
         cancelReplyBtn.classList.remove("hidden");
     }
 
-    function cancelReply() {
-        replyingTo = null;
-        messageInput.placeholder = "Напиши сообщение...";
-        cancelReplyBtn.classList.add("hidden");
-    }
-
-    function scrollToMessage(messageId) {
-        const message = document.querySelector(`[data-message-id="${messageId}"]`);
-        if (message) {
-            message.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-    }
-
     function muteUser(targetUsername) {
         if (username === targetUsername) return;
         const duration = prompt(`На сколько секунд замутить ${targetUsername}? (например, 60)`);
@@ -1367,17 +1430,6 @@ document.addEventListener('DOMContentLoaded', function() {
             socket.emit("ban user", { room: currentRoom, targetUsername });
         }
     }
-
-    function showImageModal(src) {
-        fullImage.src = src;
-        imageModal.style.display = "flex";
-    }
-
-    function closeImageModal() {
-        imageModal.style.display = "none";
-        fullImage.src = "";
-    }
-
 
     socket.on("chat history", (history) => {
         let messages = document.getElementById("messages");
@@ -1620,10 +1672,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    function showProfile(targetUsername) {
-        socket.emit("get profile", targetUsername);
-    }
-
     socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, role, isOwnProfile, canAssignGroups }) => {
         if (!nickname) {
             showNotification("Профиль не найден");
@@ -1666,63 +1714,14 @@ document.addEventListener('DOMContentLoaded', function() {
         profileModal.style.display = "flex";
     });
 
-    function closeProfileModal() {
-        profileModal.style.display = "none";
-        document.getElementById("edit-form").style.display = "none";
-        document.getElementById("group-form").style.display = "none";
-    }
-
-    function showEditForm() {
-        document.getElementById("edit-form").style.display = "block";
-        document.getElementById("edit-age").value = document.getElementById("profile-age").textContent.replace("Возраст: ", "") || "";
-        document.getElementById("edit-bio").value = document.getElementById("profile-bio").textContent === "Нет подписи" ? "" : document.getElementById("profile-bio").textContent;
-    }
-
-    function saveProfile() {
-        const avatarFile = document.getElementById("edit-avatar").files[0];
-        const age = document.getElementById("edit-age").value;
-        const bio = document.getElementById("edit-bio").value;
-
-        if (avatarFile) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                socket.emit("update profile", { avatar: reader.result, age: age || null, bio });
-            };
-            reader.readAsDataURL(avatarFile);
-        } else {
-            socket.emit("update profile", { avatar: null, age: age || null, bio });
-        }
-        closeProfileModal();
-    }
-
     socket.on("profile updated", (message) => {
         showProfile(username);
     });
-
-    function cancelEdit() {
-        document.getElementById("edit-form").style.display = "none";
-    }
-
-    function showGroupForm() {
-        document.getElementById("group-form").style.display = "block";
-    }
-
-    function assignGroup() {
-        const role = document.getElementById("group-select").value;
-        if (role) {
-            socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, role });
-        }
-        closeProfileModal();
-    }
 
     socket.on("group assigned", (message) => {
         showNotification(message);
         showProfile(document.getElementById("profile-nickname").textContent);
     });
-
-    function cancelGroupForm() {
-        document.getElementById("group-form").style.display = "none";
-    }   
 </script>
 </body>
 </html>
