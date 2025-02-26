@@ -91,7 +91,7 @@ async function loadChatHistory(socket, room) {
         replyTo: row.reply_to,
         type: row.type,
         media: row.media,
-        avatar: row.avatar || "/default-avatar.png" // Используем аватар из users, если есть
+        avatar: row.avatar || "/default-avatar.png"
     })));
 }
 
@@ -291,14 +291,25 @@ io.on("connection", (socket) => {
         await saveMessage(messageData);
     });
 
-    socket.on("join room", async (room) => {
+    socket.on("join room", async  (room) => {
         const nickname = users.get(socket.id);
         if (!nickname) return socket.emit("auth error", "Не авторизован");
     
         // Покидаем текущую комнату (если есть)
         const currentRoomValue = currentRoom.get(socket.id) || "room1";
-        if (currentRoomValue && channelUsers.has(currentRoomValue)) {
-            channelUsers.get(currentRoomValue).delete(nickname);
+        if (currentRoomValue && currentRoomValue !== room) {
+            socket.leave(currentRoomValue); // Явно покидаем старую комнату
+            if (channelUsers.has(currentRoomValue)) {
+                channelUsers.get(currentRoomValue).delete(nickname);
+                // Обновляем список пользователей в старой комнате
+                io.to(currentRoomValue).emit("update users", {
+                    users: await getAllUsers(),
+                    onlineUsers: Array.from(channelUsers.get(currentRoomValue) || []),
+                    onlineCount: (channelUsers.get(currentRoomValue) || new Set()).size,
+                    totalCount: (await getAllUsers()).length,
+                    room: currentRoomValue
+                });
+            }
         }
     
         // Присоединяемся к новой комнате
@@ -316,7 +327,7 @@ io.on("connection", (socket) => {
     
         // Обновляем пользователей для всех в комнате
         io.to(room).emit("update users", {
-            users: await getAllUsers(), // Убедимся, что это массив
+            users: await getAllUsers(),
             onlineUsers: Array.from(channelUsers.get(room)),
             onlineCount: channelUsers.get(room).size,
             totalCount: (await getAllUsers()).length,
@@ -423,20 +434,33 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", async () => {
-        const nickname = users.get(socket.id);
-        if (nickname) {
-            users.delete(socket.id);
-            await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [nickname]);
-            const allUsers = await getAllUsers();
-            const onlineUsers = Array.from(users.values());
-            io.emit("update users", { 
-                users: await getAllUsers, 
-                onlineUsers,
-                onlineCount: onlineUsers.length, 
-                totalCount: (await getAllUsers()).length 
+    const nickname = users.get(socket.id);
+    if (nickname) {
+        users.delete(socket.id);
+        const currentRoomValue = currentRoom.get(socket.id);
+        if (currentRoomValue && channelUsers.has(currentRoomValue)) {
+            channelUsers.get(currentRoomValue).delete(nickname);
+            // Обновляем список пользователей в комнате, из которой пользователь вышел
+            io.to(currentRoomValue).emit("update users", {
+                users: await getAllUsers(),
+                onlineUsers: Array.from(channelUsers.get(currentRoomValue) || []),
+                onlineCount: (channelUsers.get(currentRoomValue) || new Set()).size,
+                totalCount: (await getAllUsers()).length,
+                room: currentRoomValue
             });
         }
-    });
+        currentRoom.delete(socket.id);
+        await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [nickname]);
+        const allUsers = await getAllUsers();
+        const onlineUsers = Array.from(users.values());
+        io.emit("update users", { 
+            users: allUsers, 
+            onlineUsers,
+            onlineCount: onlineUsers.length, 
+            totalCount: allUsers.length 
+        });
+    }
+});
 });
 
 http.listen(PORT, () => {
