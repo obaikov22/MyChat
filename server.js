@@ -247,7 +247,10 @@ io.on("connection", (socket) => {
 
     socket.on("chat message", async ({ room, msg, replyTo, media }) => {
         const nickname = users.get(socket.id);
-        if (!nickname) return;
+        if (!nickname) {
+            console.error("Пользователь не авторизован, отправка сообщения невозможна");
+            return; // Не отправляем сообщение, если пользователь не авторизован
+        }
         const isMuted = mutedUsers.has(socket.id) && mutedUsers.get(socket.id) > Date.now();
         if (isMuted) {
             socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
@@ -257,16 +260,20 @@ io.on("connection", (socket) => {
         const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
         const permissions = await getUserPermissions(nickname);
         const userProfile = await getUserProfile(nickname);
+        if (!userProfile || !userProfile.nickname) {
+            console.error("Профиль пользователя не найден для ника:", nickname);
+            return; // Не отправляем сообщение, если профиль отсутствует
+        }
         const messageData = { 
             room, 
-            nickname, 
+            nickname: userProfile.nickname, // Используем nickname из профиля для надежности
             msg: msg || "", 
             timestamp, 
             messageId, 
             replyTo, 
             type: "message",
             media,
-            avatar: userProfile.avatar || "/default-avatar.png" // Убедимся, что avatar всегда есть
+            avatar: userProfile.avatar || "/default-avatar.png"
         };
         if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
@@ -274,7 +281,7 @@ io.on("connection", (socket) => {
                 messageData.msg = announcement;
                 messageData.type = "announcement";
                 messageData.media = null;
-                messageData.avatar = userProfile.avatar || "/default-avatar.png"; // Аватар для объявлений
+                messageData.avatar = userProfile.avatar || "/default-avatar.png";
                 io.to(room).emit("announcement", messageData);
                 await saveMessage(messageData);
             }

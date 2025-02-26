@@ -1499,11 +1499,17 @@
 
         socket.on("chat message", (messageData) => {
             let messages = document.getElementById("messages");
+            // Проверяем, что messageData существует и содержит необходимые поля
+            if (!messageData || !messageData.messageId) {
+                console.error("Получено некорректное сообщение:", messageData);
+                return;
+            }
             if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
                 const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
                 const isFocused = !document.hidden;
 
-                if (messageData.avatar) {
+                // Проверяем наличие nickname перед использованием
+                if (messageData.avatar && messageData.nickname) {
                     avatarCache.set(messageData.nickname, messageData.avatar);
                     saveAvatarCache(); // Сохраняем в localStorage
                 }
