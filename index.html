@@ -687,6 +687,23 @@
         .dark-theme #pm-messages .pm-message {
             background: rgba(107, 91, 149, 0.1);
         }
+
+        #toggle-pm-btn {
+            padding: 12px 20px;
+            background: var(--admin-btn-bg);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+            margin-left: 10px; /* Добавляем отступ от других элементов в топ-баре */
+        }
+
+        #toggle-pm-btn:hover {
+            background: var(--admin-btn-hover-bg);
+            transform: translateY(-2px);
+        }
+
         .bio {
             font-style: italic;
             color: var(--timestamp-color);
@@ -1508,7 +1525,12 @@
         }
 
         function togglePMPanel() {
+            console.log("togglePMPanel вызвана"); // Отладка
             const pmPanel = document.getElementById("pm-panel");
+            if (!pmPanel) {
+                console.error("Панель PM не найдена");
+                return;
+            }
             pmPanel.classList.toggle("active");
             if (pmPanel.classList.contains("active")) {
                 loadPMUsers();
@@ -1597,7 +1619,17 @@
         });
 
         // Добавь кнопку для открытия PM в топ-баре
-        document.querySelector(".top-bar").innerHTML += '<button id="toggle-pm-btn" class="admin-btn" onclick="togglePMPanel()">💬</button>';
+        document.addEventListener("DOMContentLoaded", () => {
+            const topBar = document.querySelector(".top-bar");
+            if (topBar && !document.getElementById("toggle-pm-btn")) {
+                const pmButton = document.createElement("button");
+                pmButton.id = "toggle-pm-btn";
+                pmButton.className = "admin-btn";
+                pmButton.onclick = togglePMPanel;
+                pmButton.innerHTML = "💬";
+                topBar.appendChild(pmButton);
+            }
+        });
 
         // Убедимся, что уведомление о новом PM обновляет счётчик
         document.addEventListener("visibilitychange", () => {
