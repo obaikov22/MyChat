@@ -1,596 +1,419 @@
 const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Настройка Express
 const app = express();
-const http = require('http').Server(app);
-const io = require('socket.io')(http, { cors: { origin: "*" } });
-const { Pool } = require('pg');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const MAX_MESSAGES = 100;
-
-const pool = new Pool({
-    connectionString: "postgresql://chat_user:ta0SjNKfaOEUiWgoKPXAWMp58PfuxUFb@dpg-cusu4qdumphs73ccucu0-a/chat_9oa7",
-    ssl: { rejectUnauthorized: false }
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: {
+        origin: "https://mychat-ap.onrender.com",
+        methods: ["GET", "POST"]
+    }
 });
 
-const users = new Map();
-const currentRoom = new Map(); // Хранит комнату для каждого socket.id
-const channelUsers = new Map(); // Хранит пользователей по комнатам: room -> Set(nicknames)
-const mutedUsers = new Map();
+// Настройка папки для загружаемых файлов (медиа)
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
 
-pool.connect()
-    .then(() => console.log("Подключено к PostgreSQL"))
-    .catch(err => console.error("Ошибка подключения к PostgreSQL:", err.message));
-
-app.use(express.static(__dirname));
-
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
 });
 
-async function saveUser(nickname, password) {
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const defaultAvatar = "/default-avatar.png"; // Используем локальный файл
-        const role = nickname.toLowerCase() === "admin" ? 'admin' : 'user';
-        await pool.query(`
-            INSERT INTO users (nickname, password, avatar, role)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (nickname) DO UPDATE 
-            SET password = EXCLUDED.password, 
-                avatar = COALESCE(EXCLUDED.avatar, users.avatar), 
-                role = EXCLUDED.role`,
-            [nickname, hashedPassword, defaultAvatar, role]);
-    } catch (err) {
-        console.error("Ошибка сохранения пользователя:", err.message);
-    }
-}
+const upload = multer({ storage: storage });
 
-async function verifyUser(nickname, password) {
-    try {
-        const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [nickname]);
-        if (res.rows.length === 0) {
-            await saveUser(nickname, password);
-            return true;
+// Список пользователей (в памяти, можно заменить на БД, например MongoDB)
+const users = {};
+const rooms = {
+    room1: { messages: [], users: new Set() },
+    room2: { messages: [], users: new Set() }
+};
+const privateMessages = {};
+const bans = new Set();
+const mutes = {}; // { nickname: { until: timestamp } }
+
+// Middleware
+app.use(express.json());
+app.use(express.static('public')); // Доступ к статическим файлам (index.html, uploads)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Маршруты
+app.post('/login', (req, res) => {
+    const { nickname, password } = req.body;
+    if (!nickname || !password) {
+        return res.json({ success: false, message: 'Введите никнейм и пароль' });
+    }
+
+    if (bans.has(nickname)) {
+        return res.json({ success: false, message: 'Вы забанены' });
+    }
+
+    if (users[nickname] && users[nickname].password === password) {
+        if (mutes[nickname] && Date.now() < mutes[nickname].until) {
+            return res.json({ success: false, message: `Вы заглушены до ${new Date(mutes[nickname].until).toLocaleTimeString()}` });
         }
-        const user = res.rows[0];
-        const isValid = await bcrypt.compare(password, user.password);
-        if (isValid && nickname.toLowerCase() === "admin" && user.role !== 'admin') {
-            await pool.query(`
-                UPDATE users 
-                SET role = 'admin'
-                WHERE nickname = $1`, [nickname]);
-        }
-        return isValid;
-    } catch (err) {
-        console.error("Ошибка проверки пользователя:", err.message);
-        return false;
+        res.json({ success: true, nickname, permissions: users[nickname].permissions || {} });
+    } else {
+        res.json({ success: false, message: 'Неверный никнейм или пароль' });
     }
-}
+});
 
-async function saveMessage({ room, nickname, msg, timestamp, messageId, replyTo, type, media, avatar }) {
-    try {
-        await pool.query(`
-            INSERT INTO messages (room, nickname, msg, timestamp, message_id, reply_to, type, media, avatar)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [room, nickname, msg, timestamp, messageId, replyTo, type, media, avatar]);
-    } catch (err) {
-        console.error("Ошибка сохранения сообщения:", err.message);
+app.post('/register', (req, res) => {
+    const { nickname, password } = req.body;
+    if (!nickname || !password) {
+        return res.json({ success: false, message: 'Введите никнейм и пароль' });
     }
-}
 
-async function loadChatHistory(socket, room) {
-    const result = await pool.query('SELECT m.*, u.nickname, u.avatar FROM messages m LEFT JOIN users u ON m.nickname = u.nickname WHERE m.room = $1 ORDER BY m.timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
-    socket.emit("chat history", result.rows.map(row => ({
-        nickname: row.nickname,
-        msg: row.msg,
-        timestamp: row.timestamp,
-        messageId: row.message_id,
-        replyTo: row.reply_to,
-        type: row.type,
-        media: row.media,
-        avatar: row.avatar || "/default-avatar.png"
-    })));
-}
+    if (users[nickname]) {
+        return res.json({ success: false, message: 'Никнейм уже занят' });
+    }
 
-async function getUserPermissions(nickname) {
-    try {
-        const res = await pool.query('SELECT role FROM users WHERE nickname = $1', [nickname]);
-        if (res.rows.length > 0) {
-            const role = res.rows[0].role || 'user';
-            if (role === 'admin') {
-                return {
-                    deleteMessages: true,
-                    muteUsers: true,
-                    banUsers: true,
-                    clearChat: true,
-                    assignGroups: true
-                };
-            } else if (role === 'moderator') {
-                return {
-                    deleteMessages: true,
-                    muteUsers: true,
-                    banUsers: false,
-                    clearChat: false,
-                    assignGroups: false
-                };
+    users[nickname] = { password, permissions: {} }; // Простая авторизация, можно добавить роли/права
+    res.json({ success: true, message: 'Регистрация успешна' });
+});
+
+app.post('/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: 'Файл не загружен' });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ success: true, url: fileUrl });
+});
+
+app.post('/update-profile', (req, res) => {
+    const { nickname, age, bio } = req.body;
+    if (!nickname || !users[nickname]) {
+        return res.json({ success: false, message: 'Пользователь не найден' });
+    }
+    users[nickname].age = age || users[nickname].age;
+    users[nickname].bio = bio || users[nickname].bio;
+    res.json({ success: true, profile: { nickname, age: users[nickname].age, bio: users[nickname].bio, avatar: users[nickname].avatar || '/default-avatar.png', status: 'online', achievements: [] } });
+});
+
+// Socket.IO обработчики
+io.on('connection', (socket) => {
+    let currentRoom = 'room1';
+    let currentUser = null;
+
+    socket.on('login', (data, callback) => {
+        const { nickname, password } = data;
+        if (users[nickname] && users[nickname].password === password) {
+            if (bans.has(nickname)) {
+                callback({ success: false, message: 'Вы забанены' });
+                return;
             }
+            if (mutes[nickname] && Date.now() < mutes[nickname].until) {
+                callback({ success: false, message: `Вы заглушены до ${new Date(mutes[nickname].until).toLocaleTimeString()}` });
+                return;
+            }
+            currentUser = nickname;
+            users[nickname].socketId = socket.id;
+            socket.join(currentRoom);
+            rooms[currentRoom].users.add(nickname);
+            callback({ success: true, nickname, permissions: users[nickname].permissions || {} });
+            io.to(currentRoom).emit('update users', { users: Object.values(users), onlineUsers: Array.from(rooms[currentRoom].users), onlineCount: rooms[currentRoom].users.size, totalCount: Object.keys(users).length, room: currentRoom });
+            socket.emit('avatar', { avatar: users[nickname].avatar || '/default-avatar.png' });
+        } else {
+            callback({ success: false, message: 'Неверный никнейм или пароль' });
         }
-        return { deleteMessages: false, muteUsers: false, banUsers: false, clearChat: false, assignGroups: false };
-    } catch (err) {
-        console.error("Ошибка получения прав:", err.message);
-        return { deleteMessages: false, muteUsers: false, banUsers: false, clearChat: false, assignGroups: false };
-    }
-}
+    });
 
-async function getAllUsers() {
-    try {
-        const res = await pool.query('SELECT nickname, avatar FROM users');
-        return res.rows.map(row => ({
-            nickname: row.nickname,
-            avatar: row.avatar || "/default-avatar.png"
-        }));
-    } catch (err) {
-        console.error("Ошибка получения списка пользователей:", err.message);
-        return [];
-    }
-}
+    socket.on('register', (data, callback) => {
+        const { nickname, password } = data;
+        if (users[nickname]) {
+            callback({ success: false, message: 'Никнейм уже занят' });
+        } else {
+            users[nickname] = { password, permissions: {} };
+            callback({ success: true });
+        }
+    });
 
-async function getUserProfile(nickname) {
-    try {
-        const res = await pool.query('SELECT * FROM users WHERE nickname = $1', [nickname]);
-        if (res.rows.length > 0) {
-            const user = res.rows[0];
-            return {
-                nickname: user.nickname,
-                avatar: user.avatar || "/default-avatar.png",
-                age: user.age,
-                last_seen: user.last_seen,
-                bio: user.bio,
-                achievements: user.achievements || [],
-                role: user.role || 'user'
+    socket.on('join room', (room) => {
+        if (currentUser && rooms[room]) {
+            socket.leave(currentRoom);
+            rooms[currentRoom].users.delete(currentUser);
+            socket.join(room);
+            currentRoom = room;
+            rooms[room].users.add(currentUser);
+            io.to(currentRoom).emit('update users', { users: Object.values(users), onlineUsers: Array.from(rooms[room].users), onlineCount: rooms[room].users.size, totalCount: Object.keys(users).length, room });
+            socket.emit('chat history', getPaginatedHistory(room, 1, 50));
+        }
+    });
+
+    socket.on('leave room', (room) => {
+        if (currentUser && rooms[room]) {
+            socket.leave(room);
+            rooms[room].users.delete(currentUser);
+            io.to(room).emit('update users', { users: Object.values(users), onlineUsers: Array.from(rooms[room].users), onlineCount: rooms[room].users.size, totalCount: Object.keys(users).length, room });
+        }
+    });
+
+    socket.on('leave private chat', () => {
+        if (currentUser) {
+            socket.leave('private-' + currentUser);
+        }
+    });
+
+    socket.on('chat message', (messageData) => {
+        if (!currentUser || (mutes[currentUser] && Date.now() < mutes[currentUser].until)) return;
+        const { room, msg, replyTo, media } = messageData;
+        if (rooms[room]) {
+            const message = {
+                type: 'message',
+                nickname: currentUser,
+                msg,
+                timestamp: new Date().toLocaleTimeString(),
+                messageId: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                replyTo,
+                media,
+                avatar: users[currentUser]?.avatar || '/default-avatar.png'
             };
+            rooms[room].messages.push(message);
+            if (rooms[room].messages.length > 1000) rooms[room].messages.shift(); // Ограничение на 1000 сообщений
+            io.to(room).emit('chat message', message);
+            socket.emit('typing', { nickname: currentUser, room });
         }
-        return null;
-    } catch (err) {
-        console.error("Ошибка получения профиля:", err.message);
-        return null;
-    }
-}
+    });
 
-async function savePrivateMessage(senderNickname, recipientNickname, message) {
-    try {
-        // Проверяем, существуют ли отправитель и получатель
-        const [sender, recipient] = await Promise.all([
-            pool.query('SELECT nickname FROM users WHERE nickname = $1', [senderNickname]),
-            pool.query('SELECT nickname FROM users WHERE nickname = $1', [recipientNickname])
-        ]);
-        if (!sender.rows.length || !recipient.rows.length) {
-            throw new Error("Отправитель или получатель не найден");
+    socket.on('announcement', (messageData) => {
+        if (!currentUser || !userPermissions[currentUser]?.isAdmin) return;
+        const { room, msg, replyTo, media } = messageData;
+        if (rooms[room]) {
+            const message = {
+                type: 'announcement',
+                nickname: currentUser,
+                msg,
+                timestamp: new Date().toLocaleTimeString(),
+                messageId: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                replyTo,
+                media,
+                avatar: users[currentUser]?.avatar || '/default-avatar.png'
+            };
+            rooms[room].messages.push(message);
+            if (rooms[room].messages.length > 1000) rooms[room].messages.shift();
+            io.to(room).emit('announcement', message);
         }
-        const timestamp = new Date().toLocaleTimeString();
-        await pool.query(`
-            INSERT INTO private_messages (sender_nickname, recipient_nickname, message, timestamp, read)
-            VALUES ($1, $2, $3, $4, $5)`,
-            [senderNickname, recipientNickname, message, timestamp, false]);
-    } catch (err) {
-        console.error("Ошибка сохранения личного сообщения:", err.message);
-        throw err;
-    }
-}
+    });
 
-async function getPrivateMessageHistory(senderNickname, recipientNickname) {
-    try {
-        const res = await pool.query(`
-            SELECT * FROM private_messages 
-            WHERE (sender_nickname = $1 AND recipient_nickname = $2) 
-            OR (sender_nickname = $2 AND recipient_nickname = $1)
-            ORDER BY timestamp ASC`,
-            [senderNickname, recipientNickname]);
-        return res.rows.map(row => ({
-            senderNickname: row.sender_nickname,
-            recipientNickname: row.recipient_nickname,
-            message: row.message,
-            timestamp: row.timestamp,
-            read: row.read
-        }));
-    } catch (err) {
-        console.error("Ошибка загрузки истории личных сообщений:", err.message);
-        return [];
-    }
-}
-
-async function markPrivateMessageAsRead(senderNickname, recipientNickname) {
-    try {
-        await pool.query(`
-            UPDATE private_messages 
-            SET read = TRUE 
-            WHERE sender_nickname = $1 AND recipient_nickname = $2 AND read = FALSE`,
-            [senderNickname, recipientNickname]);
-    } catch (err) {
-        console.error("Ошибка отметки сообщения как прочитанного:", err.message);
-    }
-}
-
-async function getUserAvatar(nickname) {
-    const result = await pool.query('SELECT avatar FROM users WHERE nickname = $1', [nickname]);
-    return result.rows[0]?.avatar || "/default-avatar.png";
-}
-
-async function updateUserProfile(nickname, { avatar, age, bio }) {
-    try {
-        await pool.query(`
-            UPDATE users 
-            SET avatar = COALESCE($1, avatar), 
-                age = COALESCE($2, age), 
-                bio = COALESCE($3, bio), 
-                last_seen = NOW()
-            WHERE nickname = $4`, 
-            [avatar, age, bio, nickname]);
-        const allUsers = await getAllUsers();
-        io.emit("update users avatars", allUsers);
-    } catch (err) {
-        console.error("Ошибка обновления профиля:", err.message);
-    }
-}
-
-async function assignRole(targetUsername, role) {
-    try {
-        await pool.query(`
-            UPDATE users 
-            SET role = $1
-            WHERE nickname = $2`, 
-            [role, targetUsername]);
-    } catch (err) {
-        console.error("Ошибка назначения роли:", err.message);
-    }
-}
-
-io.on("connection", (socket) => {
-    socket.on("auth", async ({ nickname, password }) => {
-        const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
-        if (existingSocketId && existingSocketId !== socket.id) {
-            users.delete(existingSocketId);
-            io.sockets.sockets.get(existingSocketId)?.disconnect();
+    socket.on('get chat history', ({ room, page, limit }, callback) => {
+        if (rooms[room]) {
+            callback(getPaginatedHistory(room, page, limit));
         }
-        const isValid = await verifyUser(nickname, password);
-        if (isValid) {
-            const token = jwt.sign({ nickname }, JWT_SECRET, { expiresIn: '1h' });
-            users.set(socket.id, nickname);
-            const permissions = await getUserPermissions(nickname);
-            socket.emit("auth success", { nickname, token, permissions });
-            const allUsers = await getAllUsers();
-            const onlineUsers = Array.from(users.values());
-            io.emit("update users", { 
-                users: await getAllUsers, 
-                onlineUsers,
-                onlineCount: onlineUsers.length, 
-                totalCount: (await getAllUsers()).length 
+    });
+
+    function getPaginatedHistory(room, page, limit) {
+        const start = (page - 1) * limit;
+        const end = start + limit;
+        return rooms[room].messages.slice().reverse().slice(start, end);
+    }
+
+    socket.on('mute user', (data) => {
+        if (!currentUser || !userPermissions[currentUser]?.muteUsers) return;
+        const { nickname, duration } = data;
+        if (users[nickname] && !bans.has(nickname)) {
+            mutes[nickname] = { until: Date.now() + duration };
+            io.emit('user muted', { nickname, duration });
+            if (users[nickname].socketId) {
+                io.to(users[nickname].socketId).emit('muted', `Вы заглушены на ${duration / 1000} секунд`);
+            }
+        }
+    });
+
+    socket.on('ban user', (nickname) => {
+        if (!currentUser || !userPermissions[currentUser]?.banUsers) return;
+        if (users[nickname]) {
+            bans.add(nickname);
+            if (users[nickname].socketId) {
+                io.to(users[nickname].socketId).emit('banned');
+                io.to(users[nickname].socketId).disconnect(true);
+            }
+            io.emit('user banned', { nickname });
+        }
+    });
+
+    socket.on('mute all', (room) => {
+        if (!currentUser || !userPermissions[currentUser]?.muteUsers) return;
+        if (rooms[room]) {
+            rooms[room].users.forEach(user => {
+                if (!bans.has(user)) {
+                    mutes[user] = { until: Date.now() + 300000 }; // 5 минут
+                    if (users[user]?.socketId) {
+                        io.to(users[user].socketId).emit('muted', 'Вы заглушены на 5 минут');
+                    }
+                }
             });
-        } else {
-            socket.emit("auth error", "Неверный ник или пароль");
+            io.to(room).emit('user muted', { nickname: 'Все', duration: 300000 });
         }
     });
 
-    socket.on("auto login", async (token) => {
-        try {
-            const decoded = jwt.verify(token, JWT_SECRET);
-            const nickname = decoded.nickname;
-            const existingSocketId = [...users.entries()].find(([_, name]) => name === nickname)?.[0];
-            if (existingSocketId && existingSocketId !== socket.id) {
-                users.delete(existingSocketId);
-                io.sockets.sockets.get(existingSocketId)?.disconnect();
-            }
-            users.set(socket.id, nickname);
-            const permissions = await getUserPermissions(nickname);
-            socket.emit("auth success", { nickname, token, permissions });
-            const allUsers = await getAllUsers();
-            const onlineUsers = Array.from(users.values());
-            io.emit("update users", { 
-                users: await getAllUsers, 
-                onlineUsers,
-                onlineCount: onlineUsers.length, 
-                totalCount: (await getAllUsers()).length 
+    socket.on('ban all', (room) => {
+        if (!currentUser || !userPermissions[currentUser]?.banUsers) return;
+        if (rooms[room]) {
+            rooms[room].users.forEach(user => {
+                bans.add(user);
+                if (users[user]?.socketId) {
+                    io.to(users[user].socketId).emit('banned');
+                    io.to(users[user].socketId).disconnect(true);
+                }
             });
-        } catch (err) {
-            socket.emit("auth error", "Неверный или просроченный токен");
+            io.to(room).emit('user banned', { nickname: 'Все' });
         }
     });
 
-    socket.on("chat message", async ({ room, msg, replyTo, media }) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) {
-            console.error("Пользователь не авторизован, отправка сообщения невозможна");
-            return; // Не отправляем сообщение, если пользователь не авторизован
-        }
-        const isMuted = mutedUsers.has(socket.id) && mutedUsers.get(socket.id) > Date.now();
-        if (isMuted) {
-            socket.emit("muted", "Вы не можете отправлять сообщения, так как находитесь в муте");
-            return;
-        }
-        const timestamp = new Date().toLocaleTimeString();
-        const messageId = Date.now() + "-" + Math.random().toString(36).substr(2, 9);
-        const permissions = await getUserPermissions(nickname);
-        const userProfile = await getUserProfile(nickname);
-        if (!userProfile || !userProfile.nickname) {
-            console.error("Профиль пользователя не найден для ника:", nickname);
-            return; // Не отправляем сообщение, если профиль отсутствует
-        }
-        const messageData = { 
-            room, 
-            nickname: userProfile.nickname, // Используем nickname из профиля для надежности
-            msg: msg || "", 
-            timestamp, 
-            messageId, 
-            replyTo, 
-            type: "message",
-            media,
-            avatar: userProfile.avatar || "/default-avatar.png"
-        };
-        if (permissions.assignGroups && msg.startsWith("/add ")) {
-            const announcement = msg.slice(5).trim();
-            if (announcement) {
-                messageData.msg = announcement;
-                messageData.type = "announcement";
-                messageData.media = null;
-                messageData.avatar = userProfile.avatar || "/default-avatar.png";
-                io.to(room).emit("announcement", messageData);
-                await saveMessage(messageData);
-            }
-            return;
-        }
-        io.to(room).emit("chat message", messageData);
-        await saveMessage(messageData);
-    });
-
-    socket.on("join room", async  (room) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return socket.emit("auth error", "Не авторизован");
-    
-        // Покидаем текущую комнату (если есть)
-        const currentRoomValue = currentRoom.get(socket.id) || "room1";
-        if (currentRoomValue && currentRoomValue !== room) {
-            socket.leave(currentRoomValue); // Явно покидаем старую комнату
-            if (channelUsers.has(currentRoomValue)) {
-                channelUsers.get(currentRoomValue).delete(nickname);
-                // Обновляем список пользователей в старой комнате
-                io.to(currentRoomValue).emit("update users", {
-                    users: await getAllUsers(),
-                    onlineUsers: Array.from(channelUsers.get(currentRoomValue) || []),
-                    onlineCount: (channelUsers.get(currentRoomValue) || new Set()).size,
-                    totalCount: (await getAllUsers()).length,
-                    room: currentRoomValue
-                });
-            }
-        }
-    
-        // Присоединяемся к новой комнате
-        socket.join(room);
-        currentRoom.set(socket.id, room);
-    
-        // Обновляем список пользователей в новой комнате
-        if (!channelUsers.has(room)) {
-            channelUsers.set(room, new Set());
-        }
-        channelUsers.get(room).add(nickname);
-    
-        // Загружаем историю сообщений для комнаты
-        loadChatHistory(socket, room);
-    
-        // Обновляем пользователей для всех в комнате
-        io.to(room).emit("update users", {
-            users: await getAllUsers(),
-            onlineUsers: Array.from(channelUsers.get(room)),
-            onlineCount: channelUsers.get(room).size,
-            totalCount: (await getAllUsers()).length,
-            room: room
-        });
-    });
-
-    socket.on("delete message", async ({ room, messageId }) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return;
-        const permissions = await getUserPermissions(nickname);
-        if (permissions.deleteMessages) {
-            await pool.query('DELETE FROM messages WHERE message_id = $1 AND room = $2', [messageId, room]);
-            io.to(room).emit("message deleted", messageId);
+    socket.on('delete message', (data) => {
+        if (!currentUser || !userPermissions[currentUser]?.deleteMessages) return;
+        const { messageId, room } = data;
+        if (rooms[room]) {
+            rooms[room].messages = rooms[room].messages.filter(msg => msg.messageId !== messageId);
+            io.to(room).emit('message deleted', messageId);
         }
     });
 
-    socket.on("clear chat", async (room) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return;
-        const permissions = await getUserPermissions(nickname);
-        if (permissions.clearChat) {
-            await pool.query('DELETE FROM messages WHERE room = $1', [room]);
-            io.to(room).emit("chat cleared");
-        }
-    });
-
-    socket.on("mute user", async ({ room, targetUsername, duration }) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return;
-        const permissions = await getUserPermissions(nickname);
-        if (permissions.muteUsers) {
-            const targetSocketId = [...users.entries()].find(([_, name]) => name === targetUsername)?.[0];
-            if (targetSocketId) {
-                mutedUsers.set(targetSocketId, Date.now() + duration * 1000);
-                io.to(room).emit("user muted", { nickname: targetUsername, duration });
-            }
-        }
-    });
-
-    socket.on("ban user", async ({ room, targetUsername }) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return;
-        const permissions = await getUserPermissions(nickname);
-        if (permissions.banUsers) {
-            const targetSocketId = [...users.entries()].find(([_, name]) => name === targetUsername)?.[0];
-            if (targetSocketId) {
-                users.delete(targetSocketId);
-                await pool.query('DELETE FROM users WHERE nickname = $1', [targetUsername]);
-                io.to(room).emit("user banned", targetUsername);
-                const allUsers = await getAllUsers();
-                const onlineUsers = Array.from(users.values());
-                io.emit("update users", { 
-                    users: await getAllUsers, 
-                    onlineUsers,
-                    onlineCount: onlineUsers.length, 
-                    totalCount: (await getAllUsers()).length 
-                });
-                io.sockets.sockets.get(targetSocketId)?.disconnect();
-            }
-        }
-    });
-
-    socket.on("typing", (room) => {
-        const nickname = users.get(socket.id);
-        if (nickname) socket.to(room).emit("typing", nickname);
-    });
-
-    socket.on("stop typing", (room) => {
-        socket.to(room).emit("stop typing");
-    });
-
-    socket.on("get profile", async (targetUsername) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return;
-        const profile = await getUserProfile(targetUsername);
-        if (profile) {
-            const permissions = await getUserPermissions(nickname);
-            socket.emit("profile data", { 
-                ...profile, 
-                isOwnProfile: nickname === targetUsername, 
-                canAssignGroups: permissions.assignGroups 
-            });
-        } else {
-            socket.emit("profile data", null);
-        }
-    });
-
-    socket.on("update profile", async ({ avatar, age, bio }) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return;
-        await updateUserProfile(nickname, { avatar, age, bio });
-        socket.emit("profile updated", "Профиль обновлён");
-    });
-
-    socket.on("assign group", async ({ targetUsername, role }) => {
-        const nickname = users.get(socket.id);
-        if (!nickname) return;
-        const permissions = await getUserPermissions(nickname);
-        if (permissions.assignGroups) {
-            await assignRole(targetUsername, role.toLowerCase());
-            io.emit("group assigned", `${targetUsername} теперь ${role === 'admin' ? 'Администратор' : 'Модератор'}`);
-        }
-    });
-
-    socket.on("send private message", async ({ recipientNickname, message }) => {
-        const senderNickname = users.get(socket.id);
-        if (!senderNickname || !recipientNickname || !message.trim()) {
-            socket.emit("private message error", "Неверные данные для личного сообщения");
-            return;
-        }
-        try {
-            await savePrivateMessage(senderNickname, recipientNickname, message);
-            const messageData = {
-                senderNickname,
+    socket.on('send private message', (data) => {
+        if (!currentUser || (mutes[currentUser] && Date.now() < mutes[currentUser].until)) return;
+        const { recipientNickname, message } = data;
+        if (users[recipientNickname]) {
+            const pmKey = [currentUser, recipientNickname].sort().join('-');
+            if (!privateMessages[pmKey]) privateMessages[pmKey] = [];
+            const pmMessage = {
+                senderNickname: currentUser,
                 recipientNickname,
                 message,
-                timestamp: new Date().toLocaleTimeString()
+                timestamp: new Date().toLocaleTimeString(),
+                read: false,
+                messageId: Date.now() + '-' + Math.random().toString(36).substr(2, 9)
             };
-            socket.emit("private message sent", messageData);
-            const recipientSocketId = [...users.entries()].find(([_, nickname]) => nickname === recipientNickname)?.[0];
-            if (recipientSocketId) {
-                io.to(recipientSocketId).emit("new private message", messageData);
-                // Обновляем счётчик непрочитанных для получателя
-                io.to(recipientSocketId).emit("get unread pm count");
+            privateMessages[pmKey].push(pmMessage);
+            if (privateMessages[pmKey].length > 1000) privateMessages[pmKey].shift();
+            if (users[recipientNickname].socketId) {
+                io.to(users[recipientNickname].socketId).emit('new private message', pmMessage);
             }
-            // Обновляем счётчик для отправителя
-            socket.emit("get unread pm count");
-        } catch (err) {
-            socket.emit("private message error", "Не удалось отправить сообщение: " + err.message);
-        }
-    });
-
-    socket.on("get private message history", async (recipientNickname) => {
-        const senderNickname = users.get(socket.id);
-        if (!senderNickname || !recipientNickname) {
-            socket.emit("private message error", "Неверные данные для истории сообщений");
-            return;
-        }
-        try {
-            const history = await getPrivateMessageHistory(senderNickname, recipientNickname);
-            socket.emit("private message history", history);
-        } catch (err) {
-            socket.emit("private message error", "Не удалось загрузить историю: " + err.message);
-        }
-    });
-
-    socket.on("mark private message as read", async (recipientNickname) => {
-        const senderNickname = users.get(socket.id);
-        if (!senderNickname || !recipientNickname) {
-            socket.emit("private message error", "Неверные данные для отметки сообщения");
-            return;
-        }
-        try {
-            await markPrivateMessageAsRead(senderNickname, recipientNickname);
-            socket.emit("get unread pm count"); // Обновляем счётчик после прочтения
-        } catch (err) {
-            socket.emit("private message error", "Не удалось отметить сообщение как прочитанное: " + err.message);
-        }
-    });
-
-    socket.on("get all users for pm", async () => {
-        const users = await getAllUsers();
-        socket.emit("all users for pm", users);
-    });
-
-    socket.on("get unread pm count", async () => {
-        const nickname = users.get(socket.id);
-        if (nickname) {
-            const res = await pool.query(`
-                SELECT COUNT(*) FROM private_messages 
-                WHERE recipient_nickname = $1 AND read = FALSE`,
-                [nickname]);
-            socket.emit("unread pm count", res.rows[0].count || 0);
+            socket.emit('private message sent', { recipientNickname });
+            updatePMCountForUser(recipientNickname);
         } else {
-            socket.emit("unread pm count", 0);
+            socket.emit('private message error', 'Пользователь не найден');
         }
     });
 
-    socket.on("disconnect", async () => {
-    const nickname = users.get(socket.id);
-    if (nickname) {
-        users.delete(socket.id);
-        const currentRoomValue = currentRoom.get(socket.id);
-        if (currentRoomValue && channelUsers.has(currentRoomValue)) {
-            channelUsers.get(currentRoomValue).delete(nickname);
-            // Обновляем список пользователей в комнате, из которой пользователь вышел
-            io.to(currentRoomValue).emit("update users", {
-                users: await getAllUsers(),
-                onlineUsers: Array.from(channelUsers.get(currentRoomValue) || []),
-                onlineCount: (channelUsers.get(currentRoomValue) || new Set()).size,
-                totalCount: (await getAllUsers()).length,
-                room: currentRoomValue
+    socket.on('get private message history', (recipientNickname, callback) => {
+        if (!currentUser || !users[recipientNickname]) {
+            callback([]);
+            return;
+        }
+        const pmKey = [currentUser, recipientNickname].sort().join('-');
+        callback(privateMessages[pmKey] || []);
+    });
+
+    socket.on('mark private message as read', (recipientNickname) => {
+        if (!currentUser || !users[recipientNickname]) return;
+        const pmKey = [currentUser, recipientNickname].sort().join('-');
+        if (privateMessages[pmKey]) {
+            privateMessages[pmKey].forEach(msg => {
+                if (!msg.read && msg.senderNickname === recipientNickname) {
+                    msg.read = true;
+                }
             });
         }
-        currentRoom.delete(socket.id);
-        await pool.query('UPDATE users SET last_seen = NOW() WHERE nickname = $1', [nickname]);
-        const allUsers = await getAllUsers();
-        const onlineUsers = Array.from(users.values());
-        io.emit("update users", { 
-            users: allUsers, 
-            onlineUsers,
-            onlineCount: onlineUsers.length, 
-            totalCount: allUsers.length 
-        });
-    }
-});
+        updatePMCountForUser(currentUser);
+    });
+
+    socket.on('get unread pm count', (callback) => {
+        if (!currentUser) {
+            callback(0);
+            return;
+        }
+        let count = 0;
+        for (let key in privateMessages) {
+            if (key.includes(currentUser)) {
+                privateMessages[key].forEach(msg => {
+                    if (!msg.read && msg.recipientNickname === currentUser) {
+                        count++;
+                    }
+                });
+            }
+        }
+        callback(count);
+    });
+
+    socket.on('get all users for pm', (callback) => {
+        callback(Object.values(users).map(user => ({
+            nickname: user.nickname || user,
+            avatar: user.avatar || '/default-avatar.png',
+            status: users[user.socketId] ? 'online' : 'offline'
+        })));
+    });
+
+    socket.on('get user profile', (nickname, callback) => {
+        if (users[nickname]) {
+            callback({
+                nickname,
+                status: users[users[nickname]?.socketId] ? 'online' : 'offline',
+                age: users[nickname].age || 'Не указан',
+                bio: users[nickname].bio || 'Биография не указана',
+                avatar: users[nickname].avatar || '/default-avatar.png',
+                achievements: [] // Можно расширить в БД
+            });
+        } else {
+            callback(null);
+        }
+    });
+
+    socket.on('update profile', (data, callback) => {
+        const { nickname, age, bio } = data;
+        if (users[nickname] && currentUser === nickname) {
+            users[nickname].age = age || users[nickname].age;
+            users[nickname].bio = bio || users[nickname].bio;
+            callback({ success: true, profile: { nickname, age: users[nickname].age, bio: users[nickname].bio, avatar: users[nickname].avatar || '/default-avatar.png', status: 'online', achievements: [] } });
+            io.emit('profile updated', { nickname, age: users[nickname].age, bio: users[nickname].bio, avatar: users[nickname].avatar || '/default-avatar.png', status: 'online', achievements: [] });
+        } else {
+            callback({ success: false, message: 'Ошибка обновления профиля' });
+        }
+    });
+
+    socket.on('typing', (data) => {
+        const { room } = data;
+        if (currentUser && rooms[room]) {
+            io.to(room).emit('typing', { nickname: currentUser });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        if (currentUser) {
+            rooms[currentRoom].users.delete(currentUser);
+            io.to(currentRoom).emit('update users', { users: Object.values(users), onlineUsers: Array.from(rooms[currentRoom].users), onlineCount: rooms[currentRoom].users.size, totalCount: Object.keys(users).length, room: currentRoom });
+            delete users[currentUser].socketId;
+        }
+    });
 });
 
-http.listen(PORT, () => {
-    console.log(`Сервер запущен на http://localhost:${PORT}`);
+function updatePMCountForUser(nickname) {
+    if (users[nickname]?.socketId) {
+        let count = 0;
+        for (let key in privateMessages) {
+            if (key.includes(nickname)) {
+                privateMessages[key].forEach(msg => {
+                    if (!msg.read && msg.recipientNickname === nickname) {
+                        count++;
+                    }
+                });
+            }
+        }
+        io.to(users[nickname].socketId).emit('unread pm count', count);
+    }
+}
+
+// Запуск сервера
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
 });
