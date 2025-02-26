@@ -11,7 +11,9 @@ const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
         origin: "https://mychat-ap.onrender.com",
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST"],
+        allowedHeaders: ["Content-Type"],
+        credentials: true
     }
 });
 
@@ -46,6 +48,10 @@ const mutes = {}; // { nickname: { until: timestamp } }
 app.use(express.json());
 app.use(express.static('public')); // Доступ к статическим файлам (index.html, uploads)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use((req, res, next) => {
+    res.setHeader('Content-Security-Policy', "default-src 'self' https://cdn.socket.io https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' wss://mychat-ap.onrender.com;");
+    next();
+});
 
 // Маршруты
 app.post('/login', (req, res) => {
@@ -66,6 +72,10 @@ app.post('/login', (req, res) => {
     } else {
         res.json({ success: false, message: 'Неверный никнейм или пароль' });
     }
+});
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.post('/register', (req, res) => {
