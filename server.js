@@ -160,6 +160,60 @@ async function getUserProfile(nickname) {
     }
 }
 
+async function savePrivateMessage(senderNickname, recipientNickname, message) {
+    try {
+        // Проверяем, существуют ли отправитель и получатель
+        const [sender, recipient] = await Promise.all([
+            pool.query('SELECT nickname FROM users WHERE nickname = $1', [senderNickname]),
+            pool.query('SELECT nickname FROM users WHERE nickname = $1', [recipientNickname])
+        ]);
+        if (!sender.rows.length || !recipient.rows.length) {
+            throw new Error("Отправитель или получатель не найден");
+        }
+        const timestamp = new Date().toLocaleTimeString();
+        await pool.query(`
+            INSERT INTO private_messages (sender_nickname, recipient_nickname, message, timestamp, read)
+            VALUES ($1, $2, $3, $4, $5)`,
+            [senderNickname, recipientNickname, message, timestamp, false]);
+    } catch (err) {
+        console.error("Ошибка сохранения личного сообщения:", err.message);
+        throw err;
+    }
+}
+
+async function getPrivateMessageHistory(senderNickname, recipientNickname) {
+    try {
+        const res = await pool.query(`
+            SELECT * FROM private_messages 
+            WHERE (sender_nickname = $1 AND recipient_nickname = $2) 
+            OR (sender_nickname = $2 AND recipient_nickname = $1)
+            ORDER BY timestamp ASC`,
+            [senderNickname, recipientNickname]);
+        return res.rows.map(row => ({
+            senderNickname: row.sender_nickname,
+            recipientNickname: row.recipient_nickname,
+            message: row.message,
+            timestamp: row.timestamp,
+            read: row.read
+        }));
+    } catch (err) {
+        console.error("Ошибка загрузки истории личных сообщений:", err.message);
+        return [];
+    }
+}
+
+async function markPrivateMessageAsRead(senderNickname, recipientNickname) {
+    try {
+        await pool.query(`
+            UPDATE private_messages 
+            SET read = TRUE 
+            WHERE sender_nickname = $1 AND recipient_nickname = $2 AND read = FALSE`,
+            [senderNickname, recipientNickname]);
+    } catch (err) {
+        console.error("Ошибка отметки сообщения как прочитанного:", err.message);
+    }
+}
+
 async function getUserAvatar(nickname) {
     const result = await pool.query('SELECT avatar FROM users WHERE nickname = $1', [nickname]);
     return result.rows[0]?.avatar || "/default-avatar.png";
@@ -430,6 +484,80 @@ io.on("connection", (socket) => {
         if (permissions.assignGroups) {
             await assignRole(targetUsername, role.toLowerCase());
             io.emit("group assigned", `${targetUsername} теперь ${role === 'admin' ? 'Администратор' : 'Модератор'}`);
+        }
+    });
+
+    socket.on("send private message", async ({ recipientNickname, message }) => {
+        const senderNickname = users.get(socket.id);
+        if (!senderNickname || !recipientNickname || !message.trim()) {
+            socket.emit("private message error", "Неверные данные для личного сообщения");
+            return;
+        }
+        try {
+            await savePrivateMessage(senderNickname, recipientNickname, message);
+            const messageData = {
+                senderNickname,
+                recipientNickname,
+                message,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            socket.emit("private message sent", messageData);
+            const recipientSocketId = [...users.entries()].find(([_, nickname]) => nickname === recipientNickname)?.[0];
+            if (recipientSocketId) {
+                io.to(recipientSocketId).emit("new private message", messageData);
+                // Обновляем счётчик непрочитанных для получателя
+                io.to(recipientSocketId).emit("get unread pm count");
+            }
+            // Обновляем счётчик для отправителя
+            socket.emit("get unread pm count");
+        } catch (err) {
+            socket.emit("private message error", "Не удалось отправить сообщение: " + err.message);
+        }
+    });
+
+    socket.on("get private message history", async (recipientNickname) => {
+        const senderNickname = users.get(socket.id);
+        if (!senderNickname || !recipientNickname) {
+            socket.emit("private message error", "Неверные данные для истории сообщений");
+            return;
+        }
+        try {
+            const history = await getPrivateMessageHistory(senderNickname, recipientNickname);
+            socket.emit("private message history", history);
+        } catch (err) {
+            socket.emit("private message error", "Не удалось загрузить историю: " + err.message);
+        }
+    });
+
+    socket.on("mark private message as read", async (recipientNickname) => {
+        const senderNickname = users.get(socket.id);
+        if (!senderNickname || !recipientNickname) {
+            socket.emit("private message error", "Неверные данные для отметки сообщения");
+            return;
+        }
+        try {
+            await markPrivateMessageAsRead(senderNickname, recipientNickname);
+            socket.emit("get unread pm count"); // Обновляем счётчик после прочтения
+        } catch (err) {
+            socket.emit("private message error", "Не удалось отметить сообщение как прочитанное: " + err.message);
+        }
+    });
+
+    socket.on("get all users for pm", async () => {
+        const users = await getAllUsers();
+        socket.emit("all users for pm", users);
+    });
+
+    socket.on("get unread pm count", async () => {
+        const nickname = users.get(socket.id);
+        if (nickname) {
+            const res = await pool.query(`
+                SELECT COUNT(*) FROM private_messages 
+                WHERE recipient_nickname = $1 AND read = FALSE`,
+                [nickname]);
+            socket.emit("unread pm count", res.rows[0].count || 0);
+        } else {
+            socket.emit("unread pm count", 0);
         }
     });
 

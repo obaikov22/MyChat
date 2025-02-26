@@ -639,6 +639,54 @@
             box-shadow: 0 2px 5px var(--shadow-color);
             transition: background 0.5s ease, color 0.5s ease, box-shadow 0.5s ease;
         }
+        .pm-panel {
+            width: 250px;
+            margin-left: 20px;
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            transition: background 0.5s ease, box-shadow 0.5s ease;
+            display: none;
+        }
+
+        .pm-panel h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            color: var(--username-color);
+            font-weight: 600;
+            display: inline;
+        }
+
+        #pm-count {
+            font-size: 0.9em;
+            color: var(--timestamp-color);
+            margin-left: 10px;
+        }
+
+        #pm-message-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--input-border);
+            border-radius: 25px;
+            background: var(--input-bg);
+            margin-bottom: 10px;
+            outline: none;
+            color: var(--text-color);
+            transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
+        }
+
+        #pm-messages .pm-message {
+            margin: 5px 0;
+            padding: 8px;
+            background: rgba(155, 89, 182, 0.1);
+            border-radius: 10px;
+            word-wrap: break-word;
+        }
+
+        .dark-theme #pm-messages .pm-message {
+            background: rgba(107, 91, 149, 0.1);
+        }
         .bio {
             font-style: italic;
             color: var(--timestamp-color);
@@ -738,6 +786,29 @@
                 flex-wrap: nowrap;
                 justify-content: space-between; /* Распределяем элементы равномерно */
             }
+            .pm-panel {
+                width: 90%;
+                max-width: 320px;
+                margin: 0 auto;
+                position: fixed;
+                top: 10%;
+                left: 50%;
+                transform: translateX(-50%);
+                height: 70vh;
+                overflow-y: auto;
+                z-index: 700;
+                display: none;
+            }
+
+            .pm-panel.active {
+                display: block;
+            }
+
+            #close-pm-btn, #toggle-pm-btn {
+                padding: 10px 15px;
+                font-size: 16px;
+                min-width: 50px;
+            }
             .users-panel {
                 width: 90%;
                 max-width: 320px; /* Увеличил максимальную ширину для удобства */
@@ -764,22 +835,22 @@
                 min-width: 50px; /* Минимальная ширина для удобства нажатия */
             }
             #toggle-users-btn {
-            display: inline-block;
-            margin: 0;
-            padding: 10px 15px;
-            font-size: 20px; /* Увеличил размер иконки для удобства */
-            min-width: 50px;
-            border-radius: 30px;
-            background: var(--admin-btn-bg);
-            color: white;
-            border: none;
-            cursor: pointer;
-            transition: background 0.3s ease, transform 0.2s ease;
-        }
-        #toggle-users-btn:hover {
+                display: inline-block;
+                margin: 0;
+                padding: 10px 15px;
+                font-size: 20px; /* Увеличил размер иконки для удобства */
+                min-width: 50px;
+                border-radius: 30px;
+                background: var(--admin-btn-bg);
+                color: white;
+                border: none;
+                cursor: pointer;
+                transition: background 0.3s ease, transform 0.2s ease;
+            }
+            #toggle-users-btn:hover {
             background: var(--admin-btn-hover-bg);
             transform: translateY(-2px);
-        }
+            }
             #messages {
                 height: calc(100vh - 140px); /* Уменьшил высоту для учета панелей ввода и топ-бара */
                 margin-bottom: 10px;
@@ -965,6 +1036,16 @@
                 <button class="admin-btn" onclick="logout()">Выйти</button>
                 <button class="admin-btn" id="theme-toggle-btn" onclick="toggleTheme()">Тёмная тема</button>
             </div>
+        </div>
+        <div class="pm-panel hidden" id="pm-panel">
+            <button id="close-pm-btn" class="admin-btn" onclick="togglePMPanel()">Скрыть</button>
+            <h3>Личные сообщения <span id="pm-count">0</span></h3>
+            <select id="pm-recipient" onchange="loadPMHistory()">
+                <option value="">Выберите получателя</option>
+            </select>
+            <input id="pm-message-input" type="text" placeholder="Напишите личное сообщение...">
+            <button onclick="sendPrivateMessage()">Отправить</button>
+            <div id="pm-messages" style="height: 300px; overflow-y: auto; margin-top: 10px; background: var(--panel-bg); padding: 10px; border-radius: 10px;"></div>
         </div>
     </div>
     <div id="profile-modal" class="modal">
@@ -1425,6 +1506,105 @@
             imageModal.style.display = "none";
             fullImage.src = "";
         }
+
+        function togglePMPanel() {
+            const pmPanel = document.getElementById("pm-panel");
+            pmPanel.classList.toggle("active");
+            if (pmPanel.classList.contains("active")) {
+                loadPMUsers();
+                updatePMCount(); // Обновляем счётчик при открытии
+            }
+        }
+
+        function loadPMUsers() {
+            const select = document.getElementById("pm-recipient");
+            select.innerHTML = '<option value="">Выберите получателя</option>';
+            socket.emit("get all users for pm");
+        }
+
+        socket.on("all users for pm", (users) => {
+            const select = document.getElementById("pm-recipient");
+            users.forEach(user => {
+                if (user.nickname !== nickname) { // Не показываем себя
+                    const option = document.createElement("option");
+                    option.value = user.nickname;
+                    option.textContent = user.nickname;
+                    select.appendChild(option);
+                }
+            });
+        });
+
+        function sendPrivateMessage() {
+            const recipientNickname = document.getElementById("pm-recipient").value;
+            const message = document.getElementById("pm-message-input").value.trim();
+            if (recipientNickname && message) {
+                socket.emit("send private message", { recipientNickname, message });
+                document.getElementById("pm-message-input").value = "";
+            } else {
+                showNotification("Выберите получателя и введите сообщение");
+            }
+        }
+
+        socket.on("private message sent", (messageData) => {
+            showNotification(`Сообщение отправлено ${messageData.recipientNickname}`);
+            loadPMHistory();
+        });
+
+        socket.on("new private message", (messageData) => {
+            showNotification(`Новое личное сообщение от ${messageData.senderNickname}`);
+            if (document.getElementById("pm-recipient").value === messageData.senderNickname) {
+                loadPMHistory();
+            }
+            updatePMCount(); // Обновляем счётчик при новом сообщении
+        });
+
+        socket.on("private message error", (message) => {
+            showNotification(message);
+        });
+
+        function loadPMHistory() {
+            const recipientNickname = document.getElementById("pm-recipient").value;
+            if (recipientNickname) {
+                socket.emit("get private message history", recipientNickname);
+                socket.emit("mark private message as read", recipientNickname);
+            }
+        }
+
+        socket.on("private message history", (history) => {
+            const pmMessages = document.getElementById("pm-messages");
+            pmMessages.innerHTML = "";
+            history.forEach(msg => {
+                const div = document.createElement("div");
+                div.className = "pm-message";
+                const isOwn = msg.senderNickname === nickname;
+                div.innerHTML = `<strong>${msg.senderNickname}</strong> (${msg.timestamp}): ${msg.message} ${!msg.read && !isOwn ? '<span style="color: #4A90E2;">(непрочитанное)</span>' : ''}`;
+                pmMessages.appendChild(div);
+            });
+            pmMessages.scrollTop = pmMessages.scrollHeight;
+            updatePMCount();
+        });
+
+        function updatePMCount() {
+            socket.emit("get unread pm count");
+        }
+
+        socket.on("unread pm count", (count) => {
+            document.getElementById("pm-count").textContent = count;
+            // Показываем уведомление, если есть непрочитанные сообщения
+            if (count > 0 && !document.getElementById("pm-panel").classList.contains("active")) {
+                showNotification(`У вас ${count} непрочитанных личных сообщений`);
+            }
+        });
+
+        // Добавь кнопку для открытия PM в топ-баре
+        document.querySelector(".top-bar").innerHTML += '<button id="toggle-pm-btn" class="admin-btn" onclick="togglePMPanel()">💬</button>';
+
+        // Убедимся, что уведомление о новом PM обновляет счётчик
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                updatePMCount();
+            }
+        });
 
         function renderMessage({ type, nickname: msgNickname, msg, timestamp, messageId, replyTo, media, avatar }) {
             const isAdmin = msgNickname?.toLowerCase() === "admin";
