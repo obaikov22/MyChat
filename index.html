@@ -1069,6 +1069,18 @@
         socket.off("chat history");
         socket.off("update users");
 
+        document.addEventListener("DOMContentLoaded", () => {
+            const cachedAvatars = localStorage.getItem("avatarCache");
+            if (cachedAvatars) {
+                avatarCache = new Map(JSON.parse(cachedAvatars));
+            }
+        });
+
+        // Сохраняем avatarCache в localStorage при изменении
+        function saveAvatarCache() {
+            localStorage.setItem("avatarCache", JSON.stringify([...avatarCache.entries()]));
+        }
+
         if (localStorage.getItem("theme") === "dark") {
             document.body.classList.add("dark-theme");
             themeToggleBtn.textContent = "Светлая тема";
@@ -1414,11 +1426,17 @@
             fullImage.src = "";
         }
 
-        function renderMessage({ type, nickname: msgUsername, msg, timestamp, messageId, replyTo, media, avatar }) {
-            const isAdmin = msgUsername?.toLowerCase() === "admin";
+        function renderMessage({ type, nickname: msgNickname, msg, timestamp, messageId, replyTo, media, avatar }) {
+            const isAdmin = msgNickname?.toLowerCase() === "admin";
+            if (avatar) {
+                avatarCache.set(msgNickname, avatar);
+                saveAvatarCache(); // Сохраняем в localStorage после обновления
+            } else {
+                avatar = avatarCache.get(msgNickname) || "/default-avatar.png";
+            }
             const replyContent = replyTo ? `
                 <div class="reply-info" onclick="scrollToMessage('${replyTo}')">
-                    ${document.querySelector(`[data-message-id="${replyTo}"] .nickname`)?.textContent || "Кто-то"}:
+                    ${document.querySelector(`[data-message-id="${replyTo}"] .username`)?.textContent || "Кто-то"}:
                     <span class="reply-text">${
                         document.querySelector(`[data-message-id="${replyTo}"] p`)?.textContent || 
                         (document.querySelector(`[data-message-id="${replyTo}"] .media-container`) ? "[Медиа]" : "Сообщение удалено")
@@ -1435,13 +1453,12 @@
                     mediaContent = `<div class="media-container"><audio controls src="${media}"></audio></div>`;
                 }
             }
-            avatarCache.set(msgUsername, avatar || "/default-avatar.png");
             return type === "announcement" ? `
                 <div class="announcement" data-message-id="${messageId}">
-                    <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <img src="${avatar}" class="message-avatar" alt="${msgNickname}'s avatar">
                     <div class="message-content">
                         ${replyContent}
-                        <span class="nickname">${msgUsername} [Объявление]</span>
+                        <span class="username">${msgNickname} [Объявление]</span>
                         <span class="timestamp">${timestamp}</span>
                         <p>${msg}</p>
                         ${mediaContent}
@@ -1451,10 +1468,10 @@
                 </div>
             ` : `
                 <div class="message" data-message-id="${messageId}">
-                    <img src="${avatar || '/default-avatar.png'}" class="message-avatar" alt="${msgUsername}'s avatar">
+                    <img src="${avatar}" class="message-avatar" alt="${msgNickname}'s avatar">
                     <div class="message-content">
                         ${replyContent}
-                        <span class="nickname ${isAdmin ? 'admin' : ''}">${msgUsername}</span>
+                        <span class="username ${isAdmin ? 'admin' : ''}">${msgNickname}</span>
                         <span class="timestamp">${timestamp}</span>
                         <p>${msg}</p>
                         ${mediaContent}
@@ -1469,6 +1486,10 @@
             let messages = document.getElementById("messages");
             messages.innerHTML = "";
             history.forEach(message => {
+                if (message.avatar) {
+                    avatarCache.set(message.nickname, message.avatar);
+                    saveAvatarCache(); // Сохраняем в localStorage
+                }
                 messages.innerHTML += renderMessage(message);
             });
             messages.scrollTop = messages.scrollHeight;
@@ -1482,6 +1503,10 @@
                 const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
                 const isFocused = !document.hidden;
 
+                if (messageData.avatar) {
+                    avatarCache.set(messageData.nickname, messageData.avatar);
+                    saveAvatarCache(); // Сохраняем в localStorage
+                }
                 messages.innerHTML += renderMessage(messageData);
                 if (isAtBottom && isFocused) {
                     messages.scrollTop = messages.scrollHeight;

@@ -70,28 +70,28 @@ async function verifyUser(nickname, password) {
     }
 }
 
-async function saveMessage({ room, nickname, msg, timestamp, messageId, replyTo, type, media }) {
+async function saveMessage({ room, nickname, msg, timestamp, messageId, replyTo, type, media, avatar }) {
     try {
         await pool.query(`
-            INSERT INTO messages (room, nickname, msg, timestamp, message_id, reply_to, type, media)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [room, nickname, msg, timestamp, messageId, replyTo, type, media]);
+            INSERT INTO messages (room, nickname, msg, timestamp, message_id, reply_to, type, media, avatar)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [room, nickname, msg, timestamp, messageId, replyTo, type, media, avatar]);
     } catch (err) {
         console.error("Ошибка сохранения сообщения:", err.message);
     }
 }
 
 async function loadChatHistory(socket, room) {
-    const result = await pool.query('SELECT m.*, u.nickname FROM messages m LEFT JOIN users u ON m.nickname = u.nickname WHERE m.room = $1 ORDER BY m.timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
+    const result = await pool.query('SELECT m.*, u.nickname, u.avatar FROM messages m LEFT JOIN users u ON m.nickname = u.nickname WHERE m.room = $1 ORDER BY m.timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
     socket.emit("chat history", result.rows.map(row => ({
-        nickname: row.nickname, // Используем nickname вместо username
+        nickname: row.nickname,
         msg: row.msg,
         timestamp: row.timestamp,
         messageId: row.message_id,
         replyTo: row.reply_to,
         type: row.type,
         media: row.media,
-        avatar: row.avatar || "/default-avatar.png"
+        avatar: row.avatar || "/default-avatar.png" // Используем аватар из users, если есть
     })));
 }
 
@@ -266,7 +266,7 @@ io.on("connection", (socket) => {
             replyTo, 
             type: "message",
             media,
-            avatar: userProfile.avatar
+            avatar: userProfile.avatar || "/default-avatar.png" // Убедимся, что avatar всегда есть
         };
         if (permissions.assignGroups && msg.startsWith("/add ")) {
             const announcement = msg.slice(5).trim();
@@ -274,6 +274,7 @@ io.on("connection", (socket) => {
                 messageData.msg = announcement;
                 messageData.type = "announcement";
                 messageData.media = null;
+                messageData.avatar = userProfile.avatar || "/default-avatar.png"; // Аватар для объявлений
                 io.to(room).emit("announcement", messageData);
                 await saveMessage(messageData);
             }
