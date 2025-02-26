@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Мой чат</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лазурный чат</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/dist/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1" defer></script>
     <style>
         :root {
             --background-gradient: linear-gradient(135deg, #E8DAEF, #F5F5F5);
@@ -30,8 +32,11 @@
             --announcement-bg: #9B59B6;
             --announcement-border: #7E57C2;
             --scrollbar-thumb: #9B59B6;
+            --tab-bg: #D1C4E9; /* Тёмно-фиолетовый акцент для красной панели */
+            --list-bg: #B3CDE0; /* Светло-серый синий для синей панели */
+            --profile-bg: #E6E6FA; /* Светло-фиолетовый для жёлтой панели */
         }
-    
+
         .dark-theme {
             --background-gradient: linear-gradient(135deg, #1F1727, #2A2E35);
             --chat-bg: #2E2A40;
@@ -57,8 +62,11 @@
             --announcement-bg: #6B5B95;
             --announcement-border: #5A4A7A;
             --scrollbar-thumb: #6B5B95;
+            --tab-bg: #4A4063; /* Тёмный акцент для тёмной темы */
+            --list-bg: #3A5A6B; /* Тёмный серый синий для тёмной темы */
+            --profile-bg: #5A4A7A; /* Тёмный фиолетовый для тёмной темы */
         }
-    
+
         body {
             background: var(--background-gradient);
             font-family: 'Segoe UI', Arial, sans-serif;
@@ -71,29 +79,29 @@
             overflow-x: hidden;
             transition: background 0.5s ease, color 0.5s ease;
         }
-    
+
         .tab-switcher {
             width: 10%; /* ~10% ширины экрана, как в макете */
             min-width: 100px;
             max-width: 150px;
-            background: #FF4040; /* Красный цвет, как в макете */
+            background: var(--tab-bg); /* Тёмно-фиолетовый акцент */
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh; /* Фиксированная высота на всю высоту экрана */
             padding: 20px 10px;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            box-shadow: 2px 0 10px var(--shadow-color);
             display: flex;
             flex-direction: column;
             gap: 10px;
             z-index: 800; /* Выше .top-bar и .pm-panel */
             transition: all 0.3s ease;
         }
-    
+
         .tab-btn {
             padding: 12px 15px;
-            background: #FFFFFF;
-            color: #FF4040;
+            background: var(--chat-bg);
+            color: var(--nickname-color);
             border: none;
             border-radius: 8px;
             cursor: pointer;
@@ -101,17 +109,17 @@
             transition: background 0.3s ease, color 0.3s ease;
             width: 100%;
         }
-    
+
         .tab-btn.active {
-            background: #FF4040;
+            background: var(--nickname-color);
             color: #FFFFFF;
         }
-    
+
         .tab-btn:hover {
-            background: #FF6666;
+            background: var(--button-hover-bg);
             color: #FFFFFF;
         }
-    
+
         .chat-room, .auth-container {
             width: 60%; /* ~60% ширины экрана, как в макете */
             max-width: 800px; /* Ограничение ширины для чата */
@@ -128,13 +136,13 @@
             transition: all 0.3s ease;
             overflow: visible; /* Убедимся, что .top-bar и другие элементы видны */
         }
-    
+
         .chat-container {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
         }
-    
+
         .top-bar {
             position: relative; /* Убираем fixed, чтобы он был внутри .chat-room */
             top: 0;
@@ -149,7 +157,7 @@
             justify-content: space-between;
             transition: all 0.3s ease;
         }
-    
+
         #messages {
             height: 500px; /* Сохраняем высоту для чата */
             overflow-y: auto;
@@ -161,16 +169,16 @@
             scrollbar-color: var(--scrollbar-thumb) var(--messages-bg);
             transition: background 0.5s ease;
         }
-    
+
         #messages::-webkit-scrollbar {
             width: 8px;
         }
-    
+
         #messages::-webkit-scrollbar-thumb {
             background: var(--scrollbar-thumb);
             border-radius: 4px;
         }
-    
+
         #message-input {
             width: 70%;
             padding: 12px 15px;
@@ -181,14 +189,14 @@
             color: var(--text-color);
             transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
         }
-    
+
         #message-input:focus {
             border-color: var(--nickname-color);
             box-shadow: 0 0 5px var(--shadow-color);
         }
-    
+
         #nickname-input, #password-input {
-            width: 50%;
+            width: 100%;
             padding: 12px;
             border: none;
             border-radius: 25px;
@@ -199,7 +207,7 @@
             box-shadow: inset 0 2px 5px var(--shadow-color);
             transition: background 0.5s ease, color 0.5s ease;
         }
-    
+
         button {
             padding: 12px 20px;
             background: var(--button-bg);
@@ -209,12 +217,12 @@
             cursor: pointer;
             transition: background 0.3s ease, transform 0.2s ease;
         }
-    
+
         button:hover {
             background: var(--button-hover-bg);
             transform: translateY(-2px);
         }
-    
+
         select {
             padding: 10px 15px;
             border: none;
@@ -230,11 +238,11 @@
             background-position: right 10px center;
             transition: background 0.5s ease, color 0.5s ease;
         }
-    
+
         .dark-theme select {
             background-image: url('data:image/svg+xml;utf8,<svg fill="%236B5B95" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
         }
-    
+
         .message {
             margin: 10px 0;
             padding: 12px 15px;
@@ -247,19 +255,19 @@
             align-items: flex-start;
             transition: background 0.5s ease;
         }
-    
+
         .message:hover {
             background: #D1C4E9;
         }
-    
+
         .dark-theme .message:hover {
             background: #4A4063;
         }
-    
+
         .message:hover .delete-btn, .message:hover .reply-btn {
             display: inline;
         }
-    
+
         .announcement {
             margin: 15px 0;
             padding: 15px;
@@ -275,23 +283,23 @@
             display: flex;
             align-items: flex-start;
         }
-    
+
         .announcement .nickname {
             color: white;
         }
-    
+
         .announcement .timestamp {
             color: #E0E0E0;
         }
-    
+
         .dark-theme .announcement .timestamp {
             color: #B0B0B0;
         }
-    
+
         .announcement:hover {
             background: var(--button-hover-bg);
         }
-    
+
         .message-avatar, .user-avatar {
             width: 30px;
             height: 30px;
@@ -301,26 +309,26 @@
             border: 2px solid var(--nickname-color);
             transition: border 0.5s ease;
         }
-    
+
         .message-content {
             flex-grow: 1;
         }
-    
+
         .nickname {
             font-weight: 600;
             color: var(--nickname-color);
         }
-    
+
         .nickname.admin {
             color: var(--admin-nickname-color);
         }
-    
+
         .timestamp {
             font-size: 0.85em;
             color: var(--timestamp-color);
             margin-left: 10px;
         }
-    
+
         .reply-info {
             font-size: 0.9em;
             color: var(--admin-btn-bg);
@@ -332,19 +340,19 @@
             border-left: 3px solid var(--admin-btn-bg);
             transition: background 0.5s ease, color 0.5s ease, border 0.5s ease;
         }
-    
+
         .reply-info:hover {
             background: rgba(38, 166, 154, 0.2);
         }
-    
+
         .dark-theme .reply-info {
             background: rgba(74, 122, 140, 0.1);
         }
-    
+
         .dark-theme .reply-info:hover {
             background: rgba(74, 122, 140, 0.2);
         }
-    
+
         .reply-text {
             font-style: italic;
             color: var(--timestamp-color);
@@ -354,18 +362,18 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-    
+
         #emoji-button, #attach-button {
             margin-left: 10px;
             background: var(--admin-btn-bg);
             padding: 12px;
             font-size: 18px;
         }
-    
+
         #emoji-button:hover, #attach-button:hover {
             background: var(--admin-btn-hover-bg);
         }
-    
+
         emoji-picker {
             position: absolute;
             display: none;
@@ -375,7 +383,7 @@
             background: var(--chat-bg);
             transition: background 0.5s ease, box-shadow 0.5s ease;
         }
-    
+
         .input-container {
             display: flex;
             align-items: center;
@@ -384,7 +392,7 @@
             padding: 10px 0;
             width: 100%;
         }
-    
+
         #new-messages-count {
             display: none;
             position: absolute;
@@ -401,14 +409,14 @@
             font-weight: bold;
             z-index: 600;
         }
-    
+
         #new-messages-divider {
             display: none;
             margin: 10px 0;
             text-align: center;
             position: relative;
         }
-    
+
         #new-messages-divider::before {
             content: "";
             position: absolute;
@@ -419,7 +427,7 @@
             background: #4A90E2;
             z-index: 1;
         }
-    
+
         #new-messages-divider span {
             background: var(--messages-bg);
             color: #FFFFFF;
@@ -430,62 +438,62 @@
             border-radius: 10px;
             background: #4A90E2;
         }
-    
+
         .hidden {
             display: none;
         }
-    
+
         #auth-error {
             color: var(--delete-btn-bg);
             font-size: 0.9em;
             margin-top: 5px;
         }
-    
-        .users-panel {
+
+        .users-panel, .pm-list {
             width: 20%; /* ~20% ширины экрана, как в макете */
             max-width: 300px; /* Ограничение ширины для списка */
-            background: #4682B4; /* Синий цвет, как в макете */
+            background: var(--list-bg); /* Светло-серый синий для акцента */
             padding: 15px;
             border-radius: 10px 0 0 10px; /* Радиус только для левой стороны */
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            box-shadow: 2px 0 10px var(--shadow-color);
             position: fixed;
             top: 0; /* Прижимаем к верху */
             left: 10%; /* Смещаем вправо, чтобы оставить место для красной панели */
             height: 100vh; /* Высота на всю высоту экрана */
             overflow-y: auto;
             z-index: 600;
-            display: none; /* По умолчанию скрыт, показываем в режиме "Чат" */
+            display: none; /* По умолчанию скрыт, показываем в соответствующем режиме */
             transition: all 0.3s ease;
         }
-    
-        .users-panel.active {
+
+        .users-panel.active, .pm-list.active {
             display: block;
         }
-    
-        .users-panel h3 {
+
+        .users-panel h3, .pm-list h3 {
             margin: 0 0 15px 0;
             font-size: 1.2em;
-            color: #FFFFFF; /* Белый цвет для контраста с синим фоном */
+            color: #FFFFFF; /* Белый цвет для контраста с фоном */
             font-weight: 600;
         }
-    
+
         #close-users-btn {
             display: none;
         }
-    
+
         #user-count {
             font-size: 0.9em;
             color: var(--timestamp-color);
             margin-left: 10px;
         }
-    
-        .users-panel ul {
+
+        .users-panel ul, .pm-list ul {
             list-style: none;
             padding: 0;
             margin: 0;
         }
-    
-        .users-panel li {
+
+        .users-panel li, .pm-list li {
             padding: 8px 0;
             color: #FFFFFF;
             display: flex;
@@ -496,20 +504,20 @@
             cursor: pointer;
             transition: background 0.2s ease, color 0.5s ease;
         }
-    
-        .users-panel li:hover {
+
+        .users-panel li:hover, .pm-list li:hover {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 5px;
         }
-    
+
         .users-panel li.offline {
             color: var(--offline-color);
         }
-    
+
         .admin-controls {
             margin-top: 15px;
         }
-    
+
         .admin-btn {
             padding: 8px 15px;
             font-size: 0.9em;
@@ -519,61 +527,22 @@
             width: 100%;
             transition: background 0.3s ease;
         }
-    
+
         .admin-btn:hover {
             background: var(--admin-btn-hover-bg);
         }
-    
+
         #toggle-users-btn {
             display: none;
         }
-    
-        .pm-list {
-            width: 20%;
-            max-width: 300px;
-            background: #4682B4; /* Синий цвет, как в макете */
-            padding: 15px;
-            border-radius: 10px 0 0 10px;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
-            position: fixed;
-            top: 0;
-            left: 10%;
-            height: 100vh;
-            overflow-y: auto;
-            z-index: 600;
-            display: none; /* По умолчанию скрыт, показываем в режиме "PM" */
-            transition: all 0.3s ease;
-        }
-    
-        .pm-list.active {
-            display: block;
-        }
-    
-        .pm-list ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-    
-        .pm-list li {
-            padding: 8px 0;
-            color: #FFFFFF;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-    
-        .pm-list li:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-        }
-    
+
         .user-profile {
             width: 10%; /* ~10% ширины экрана, как в макете */
             max-width: 150px; /* Ограничение ширины для профиля */
-            background: #FFFF00; /* Жёлтый цвет, как в макете */
+            background: var(--profile-bg); /* Светло-фиолетовый акцент */
             padding: 15px;
             border-radius: 0 10px 10px 0; /* Радиус только для правой стороны */
-            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+            box-shadow: -2px 0 10px var(--shadow-color);
             position: fixed;
             top: 0; /* Прижимаем к верху */
             right: 0; /* Прижимаем к правому краю */
@@ -583,11 +552,11 @@
             display: none; /* По умолчанию скрыт, показываем в режиме "PM" */
             transition: all 0.3s ease;
         }
-    
+
         .user-profile.active {
             display: block;
         }
-    
+
         .user-profile .profile-header {
             display: flex;
             flex-direction: column;
@@ -595,31 +564,31 @@
             gap: 10px;
             margin-bottom: 15px;
         }
-    
+
         .user-profile .profile-info h4 {
             margin: 0;
             font-size: 1em;
             color: #333;
             font-weight: 600;
         }
-    
+
         .user-profile .profile-info .status {
             font-size: 0.9em;
             color: #777;
         }
-    
+
         .user-profile .profile-info .age {
             font-size: 0.9em;
             color: #777;
         }
-    
+
         .user-profile .achievements {
             margin: 15px 0;
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
         }
-    
+
         .user-profile .achievement {
             background: var(--panel-bg);
             padding: 6px 10px;
@@ -628,7 +597,7 @@
             color: var(--nickname-color);
             transition: all 0.3s ease;
         }
-    
+
         .user-profile .bio {
             font-style: italic;
             color: #777;
@@ -639,163 +608,7 @@
             font-size: 0.9em;
             line-height: 1.4;
         }
-    
-        .pm-panel {
-            width: 250px;
-            background: var(--panel-bg);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px var(--shadow-color);
-            transition: background 0.5s ease, box-shadow 0.5s ease;
-            display: none;
-            position: fixed;
-            top: 10%;
-            left: 30%; /* Смещаем влево, чтобы соответствовать синей панели */
-            height: 70vh;
-            overflow-y: auto;
-            z-index: 700;
-            visibility: hidden;
-        }
-    
-        .pm-panel.active {
-            display: block;
-            visibility: visible;
-        }
-    
-        .pm-panel h3 {
-            margin: 0 0 15px 0;
-            font-size: 1.2em;
-            color: var(--username-color);
-            font-weight: 600;
-            display: inline;
-        }
-    
-        #pm-count {
-            font-size: 0.9em;
-            color: var(--timestamp-color);
-            margin-left: 10px;
-        }
-    
-        #pm-message-input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid var(--input-border);
-            border-radius: 25px;
-            background: var(--input-bg);
-            margin-bottom: 10px;
-            outline: none;
-            color: var(--text-color);
-            transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
-        }
-    
-        #pm-messages .pm-message {
-            margin: 5px 0;
-            padding: 8px;
-            background: rgba(155, 89, 182, 0.1);
-            border-radius: 10px;
-            word-wrap: break-word;
-        }
-    
-        .dark-theme #pm-messages .pm-message {
-            background: rgba(107, 91, 149, 0.1);
-        }
-    
-        #toggle-pm-btn {
-            padding: 10px 15px;
-            background: var(--admin-btn-bg);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: background 0.3s ease, transform 0.2s ease;
-            margin-left: 5px;
-        }
-    
-        #toggle-pm-btn:hover {
-            background: var(--admin-btn-hover-bg);
-            transform: translateY(-2px);
-        }
-    
-        .delete-btn, .reply-btn {
-            display: none;
-            position: absolute;
-            right: 10px;
-            top: 10px;
-            padding: 5px 10px;
-            background: var(--delete-btn-bg);
-            font-size: 0.85em;
-            border-radius: 20px;
-        }
-    
-        .reply-btn {
-            background: var(--reply-btn-bg);
-            right: 70px;
-        }
-    
-        .reply-btn:hover {
-            background: var(--reply-btn-hover-bg);
-        }
-    
-        #cancel-reply-btn {
-            background: var(--delete-btn-bg);
-            padding: 8px 12px;
-            margin-left: 10px;
-        }
-    
-        #cancel-reply-btn:hover {
-            background: var(--delete-btn-hover-bg);
-        }
-    
-        .admin-icon {
-            background: none;
-            padding: 5px;
-            margin-left: 5px;
-            font-size: 16px;
-            color: var(--admin-btn-bg);
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s ease, color 0.5s ease;
-        }
-    
-        .admin-icon:hover {
-            background: rgba(38, 166, 154, 0.2);
-            color: var(--admin-btn-hover-bg);
-        }
-    
-        .dark-theme .admin-icon:hover {
-            background: rgba(74, 122, 140, 0.2);
-        }
-    
-        #typing-status {
-            font-size: 0.9em;
-            color: var(--timestamp-color);
-            margin-top: 10px;
-        }
-    
-        .media-container {
-            margin-top: 10px;
-            max-width: 100%;
-        }
-    
-        .media-container img {
-            max-width: 300px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px var(--shadow-color);
-            cursor: pointer;
-            transition: box-shadow 0.5s ease;
-        }
-    
-        .media-container video, .media-container audio {
-            max-width: 300px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px var(--shadow-color);
-            transition: box-shadow 0.5s ease;
-        }
-    
+
         .modal, .image-modal, .preview-modal {
             display: none;
             position: fixed;
@@ -809,7 +622,7 @@
             z-index: 1000;
             animation: fadeIn 0.3s ease;
         }
-    
+
         #upload-progress {
             width: 70%;
             height: 8px;
@@ -820,14 +633,14 @@
             display: none;
             transition: background 0.5s ease;
         }
-    
+
         #upload-progress-bar {
             width: 0%;
             height: 100%;
             background: var(--button-bg);
             transition: width 0.3s ease;
         }
-    
+
         #notification {
             position: fixed;
             top: 20px;
@@ -844,17 +657,17 @@
             animation: slideInNotification 0.3s ease forwards;
             transition: background 0.5s ease, box-shadow 0.5s ease;
         }
-    
+
         @keyframes slideInNotification {
             from { transform: translateY(-100%); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
-    
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
         }
-    
+
         .modal-content, .image-modal-content, .preview-modal-content {
             background: var(--chat-bg);
             padding: 20px;
@@ -867,19 +680,19 @@
             animation: slideIn 0.3s ease forwards;
             transition: background 0.5s ease, box-shadow 0.5s ease;
         }
-    
+
         .image-modal-content, .preview-modal-content {
             width: auto;
             max-width: 90%;
             max-height: 90vh;
             padding: 10px;
         }
-    
+
         @keyframes slideIn {
             from { transform: translateY(-50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
-    
+
         .modal-content img {
             width: 100px;
             height: 100px;
@@ -888,11 +701,11 @@
             border: 3px solid var(--nickname-color);
             transition: border 0.5s ease;
         }
-    
+
         .modal-content img:hover {
             transform: scale(1.05);
         }
-    
+
         .image-modal-content img, .preview-modal-content img {
             max-width: 100%;
             max-height: 80vh;
@@ -900,7 +713,7 @@
             box-shadow: 0 4px 15px var(--shadow-color);
             transition: box-shadow 0.5s ease;
         }
-    
+
         .preview-modal-content video {
             max-width: 100%;
             max-height: 80vh;
@@ -908,17 +721,17 @@
             box-shadow: 0 4px 15px var(--shadow-color);
             transition: box-shadow 0.5s ease;
         }
-    
+
         .preview-buttons {
             margin-top: 10px;
             display: flex;
             justify-content: space-between;
         }
-    
+
         .preview-buttons button {
             width: 48%;
         }
-    
+
         .bio {
             font-style: italic;
             color: var(--timestamp-color);
@@ -930,7 +743,7 @@
             line-height: 1.4;
             transition: background 0.5s ease, color 0.5s ease;
         }
-    
+
         .close-btn {
             position: absolute;
             top: 15px;
@@ -942,22 +755,22 @@
             cursor: pointer;
             transition: color 0.3s ease;
         }
-    
+
         .close-btn:hover {
             color: var(--delete-btn-bg);
         }
-    
+
         .edit-form, .group-form {
             display: none;
             margin-top: 20px;
             animation: fadeSlideIn 0.3s ease;
         }
-    
+
         @keyframes fadeSlideIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-    
+
         .edit-form input, .edit-form textarea, .group-form select {
             width: 100%;
             padding: 10px;
@@ -970,32 +783,32 @@
             color: var(--text-color);
             transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
         }
-    
+
         .edit-form input:focus, .edit-form textarea:focus, .group-form select:focus {
             border-color: var(--nickname-color);
             outline: none;
         }
-    
+
         .edit-form textarea {
             height: 80px;
             resize: none;
         }
-    
+
         .edit-form button, .group-form button {
             margin-top: 10px;
             width: 48%;
             font-size: 1em;
         }
-    
+
         .edit-form button:nth-child(2), .group-form button:nth-child(2) {
             background: var(--delete-btn-bg);
             margin-left: 4%;
         }
-    
+
         .edit-form button:nth-child(2):hover, .group-form button:nth-child(2):hover {
             background: var(--delete-btn-hover-bg);
         }
-    
+
         @media (max-width: 768px) {
             body {
                 align-items: flex-start;
@@ -1041,11 +854,11 @@
                 z-index: 700;
                 display: none;
             }
-    
+
             .pm-panel.active {
                 display: block;
             }
-    
+
             #close-pm-btn, #toggle-pm-btn {
                 padding: 10px 15px;
                 font-size: 16px;
@@ -1237,11 +1050,11 @@
 </head>
 <body>
     <div class="tab-switcher" id="tab-switcher">
-        <button class="tab-btn active" onclick="switchTab('chat')">Чат</button>
+        <button class="tab-btn active" onclick="switchTab('chat')">Каналы</button>
         <button class="tab-btn" onclick="switchTab('pm')">Личные сообщения</button>
     </div>
 
-    <div class="chat-room">
+    <div class="chat-room hidden">
         <div class="top-bar">
             <select id="room-select" onchange="joinRoom(this.value)">
                 <option value="room1">Комната 1</option>
@@ -1279,6 +1092,12 @@
     <div class="pm-list" id="pm-list">
         <h3>Личные сообщения</h3>
         <ul></ul>
+        <select id="pm-recipient" onchange="loadPMHistory()">
+            <option value="">Выберите получателя</option>
+        </select>
+        <input id="pm-message-input" type="text" placeholder="Напишите личное сообщение...">
+        <button onclick="sendPrivateMessage()">Отправить</button>
+        <div id="pm-messages" style="height: 300px; overflow-y: auto; margin-top: 10px; background: var(--panel-bg); padding: 10px; border-radius: 10px;"></div>
     </div>
 
     <div class="user-profile" id="user-profile">
@@ -1294,18 +1113,7 @@
         <div class="bio">Биография пользователя...</div>
     </div>
 
-    <div class="pm-panel hidden" id="pm-panel">
-        <button id="close-pm-btn" class="admin-btn" onclick="togglePMPanel()">Скрыть</button>
-        <h3>Личные сообщения <span id="pm-count">0</span></h3>
-        <select id="pm-recipient" onchange="loadPMHistory()">
-            <option value="">Выберите получателя</option>
-        </select>
-        <input id="pm-message-input" type="text" placeholder="Напишите личное сообщение...">
-        <button onclick="sendPrivateMessage()">Отправить</button>
-        <div id="pm-messages" style="height: 300px; overflow-y: auto; margin-top: 10px; background: var(--panel-bg); padding: 10px; border-radius: 10px;"></div>
-    </div>
-
-    <div class="auth-container hidden" id="auth-container">
+    <div class="auth-container" id="auth-container">
         <h2>Вход в чат</h2>
         <input type="text" id="nickname-input" placeholder="Ваш никнейм">
         <input type="password" id="password-input" placeholder="Пароль">
@@ -1413,7 +1221,7 @@
             document.getElementById('profile-nickname').textContent = nickname;
             document.getElementById('profile-status').textContent = 'Онлайн';
             updateUsersPanel();
-            switchTab('chat'); // Инициализация в режиме "Чат"
+            switchTab('chat'); // Инициализация в режиме "Каналы"
         });
 
         socket.on('login error', (message) => {
@@ -1687,6 +1495,7 @@
             const usersPanel = document.getElementById("users-panel");
             const pmList = document.getElementById("pm-list");
             const userProfile = document.getElementById("user-profile");
+            const chatRoom = document.querySelector(".chat-room");
 
             // Устанавливаем активную вкладку
             tabSwitcher.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
@@ -1694,10 +1503,11 @@
 
             // Показываем/скрываем панели в зависимости от режима
             if (tab === "chat") {
-                // Режим "Чат"
+                // Режим "Каналы"
                 usersPanel.classList.add("active");
                 pmList.classList.remove("active");
                 userProfile.classList.remove("active");
+                chatRoom.classList.remove("hidden"); // Показываем чат
                 // Убедимся, что показываем текущую комнату
                 const currentRoom = document.getElementById("room-select").value || "room1";
                 socket.emit("join room", currentRoom);
@@ -1707,6 +1517,7 @@
                 usersPanel.classList.remove("active");
                 pmList.classList.add("active");
                 userProfile.classList.remove("active"); // Скрываем профиль по умолчанию, пока не выбран пользователь
+                chatRoom.classList.add("hidden"); // Скрываем чат
                 socket.emit("leave room", currentRoom);
                 socket.emit("get all users for pm");
                 loadPMUsers();
@@ -1719,17 +1530,21 @@
         function updateInterface() {
             const tab = document.querySelector(".tab-btn.active").getAttribute("onclick").match(/'([^']+)'/)[1];
             if (tab === "pm") {
-                document.getElementById("pm-panel").classList.add("active");
+                document.getElementById("pm-list").classList.add("active");
                 document.getElementById("users-panel").classList.remove("active");
             } else {
-                document.getElementById("pm-panel").classList.remove("active");
                 document.getElementById("users-panel").classList.add("active");
+                document.getElementById("pm-list").classList.remove("active");
             }
         }
 
         // Инициализация при загрузке
         document.addEventListener("DOMContentLoaded", () => {
-            switchTab("chat"); // По умолчанию открываем режим "Чат"
+            // По умолчанию показываем окно авторизации
+            document.querySelector('.chat-room').classList.add('hidden');
+            document.getElementById('auth-container').classList.remove('hidden');
+            switchTab("chat"); // По умолчанию открываем режим "Каналы"
+            
             const pmList = document.querySelector(".pm-list");
             if (pmList) {
                 pmList.addEventListener("click", (e) => {
@@ -1744,28 +1559,18 @@
             }
         });
 
-        toggleUsersPanel(); {
-            const usersPanel = document.getElementById('users-panel');
-            usersPanel.classList.toggle('active');
-        }
-
         function togglePMPanel() {
             console.log("togglePMPanel вызвана");
-            const pmPanel = document.getElementById("pm-panel");
-            if (!pmPanel) {
-                console.error("Панель PM не найдена");
+            const pmList = document.getElementById("pm-list");
+            if (!pmList) {
+                console.error("Список PM не найден");
                 return;
             }
-            pmPanel.classList.toggle("active");
-            console.log("pmPanel.active:", pmPanel.classList.contains("active"), "Стиль display:", window.getComputedStyle(pmPanel).display, "Стиль visibility:", window.getComputedStyle(pmPanel).visibility, "Позиция:", pmPanel.getBoundingClientRect());
-            if (pmPanel.classList.contains("active")) {
+            pmList.classList.toggle("active");
+            console.log("pmList.active:", pmList.classList.contains("active"), "Стиль display:", window.getComputedStyle(pmList).display);
+            if (pmList.classList.contains("active")) {
                 loadPMUsers();
                 updatePMCount(); // Обновляем счётчик при открытии
-                const rect = pmPanel.getBoundingClientRect();
-                if (rect.top < 0 || rect.bottom > window.innerHeight || rect.left < 0 || rect.right > window.innerWidth) {
-                    console.warn("Панель PM вне видимой области, корректируй стили");
-                    pmPanel.style.left = "30%"; // Смещаем влево, чтобы соответствовать синей панели
-                }
             }
         }
 
@@ -1857,7 +1662,7 @@
 
         socket.on("unread pm count", (count) => {
             document.getElementById("pm-count").textContent = count;
-            if (count > 0 && !document.getElementById("pm-panel").classList.contains("active")) {
+            if (count > 0) {
                 showNotification(`У вас ${count} непрочитанных личных сообщений`);
             }
         });
