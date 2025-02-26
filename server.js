@@ -82,9 +82,9 @@ async function saveMessage({ room, nickname, msg, timestamp, messageId, replyTo,
 }
 
 async function loadChatHistory(socket, room) {
-    const result = await pool.query('SELECT m.*, u.nickname FROM messages m LEFT JOIN users u ON m.username = u.nickname WHERE m.room = $1 ORDER BY m.timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
+    const result = await pool.query('SELECT m.*, u.nickname FROM messages m LEFT JOIN users u ON m.nickname = u.nickname WHERE m.room = $1 ORDER BY m.timestamp ASC LIMIT $2', [room, MAX_MESSAGES]);
     socket.emit("chat history", result.rows.map(row => ({
-        username: row.nickname, // Используем nickname вместо username
+        nickname: row.nickname, // Используем nickname вместо username
         msg: row.msg,
         timestamp: row.timestamp,
         messageId: row.message_id,
