@@ -81,8 +81,8 @@
             display: flex;
             flex-direction: row;
             transition: background 0.5s ease, box-shadow 0.5s ease;
-            overflow: visible; /* Убедимся, что панель PM видна, если выходит за пределы */
         }
+
         .chat-container {
             flex-grow: 1;
             display: flex;
@@ -97,8 +97,11 @@
             background: var(--chat-bg);
             z-index: 600;
             box-shadow: 0 2px 10px var(--shadow-color);
+            display: flex;
             flex-wrap: nowrap;
             justify-content: space-between; /* Распределяем элементы равномерно */
+            max-width: 1100px; /* Ограничиваем ширину, как у .chat-room */
+            margin: 0 auto; /* Центрируем топ-бар, как .chat-room */
         }
         #messages {
             height: 500px;
@@ -708,14 +711,14 @@
         }
 
         #toggle-pm-btn {
-            padding: 12px 20px;
+            padding: 10px 15px; /* Уменьшаем горизонтальный padding с 20px до 15px */
             background: var(--admin-btn-bg);
             color: white;
             border: none;
             border-radius: 25px;
             cursor: pointer;
             transition: background 0.3s ease, transform 0.2s ease;
-            margin-left: 10px; /* Добавляем отступ от других элементов в топ-баре */
+            margin-left: 5px; /* Уменьшаем отступ с 10px до 5px */
         }
 
         #toggle-pm-btn:hover {
