@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Лазурный чат</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/dist/index.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1" defer></script>
     <style>
         :root {
@@ -1274,7 +1275,23 @@
                 return;
             }
 
-            socket.emit('login', { nickname, password });
+            socket.emit('login', { nickname, password }, (response) => {
+                if (response.success) {
+                    nickname = response.nickname;
+                    userPermissions = response.permissions || {};
+                    document.getElementById('auth-container').classList.add('hidden');
+                    document.querySelector('.chat-room').classList.remove('hidden');
+                    joinRoom(currentRoom);
+                    loadChatHistory(1);
+                    socket.emit('get avatar', nickname);
+                    document.getElementById('profile-nickname').textContent = nickname;
+                    document.getElementById('profile-status').textContent = 'Онлайн';
+                    updateUsersPanel();
+                    switchTab('chat'); // Инициализация в режиме "Каналы"
+                } else {
+                    document.getElementById('auth-error').textContent = response.message;
+                }
+            });
         }
 
         function register() {
