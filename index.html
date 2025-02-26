@@ -74,8 +74,8 @@
     
         .tab-switcher {
             width: 10%; /* ~10% ширины экрана, как в макете */
-            min-width: 100px; /* Минимальная ширина для читаемости */
-            max-width: 150px; /* Максимальная ширина для компактности */
+            min-width: 100px;
+            max-width: 150px;
             background: #FF4040; /* Красный цвет, как в макете */
             position: fixed;
             top: 0;
@@ -124,7 +124,7 @@
             margin-left: 15%; /* Смещаем вправо, чтобы оставить место для синей панели */
             margin-right: 10%; /* Смещаем влево, чтобы оставить место для жёлтой панели */
             position: relative;
-            top: 60px; /* Смещаем вниз, чтобы учесть .top-bar */
+            top: 0; /* Смещаем вниз, чтобы учесть .top-bar, но оставляем внутри .chat-room */
             transition: all 0.3s ease;
             overflow: visible; /* Убедимся, что .top-bar и другие элементы видны */
         }
@@ -449,9 +449,9 @@
             border-radius: 10px 0 0 10px; /* Радиус только для левой стороны */
             box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
             position: fixed;
-            top: 60px; /* Смещаем вниз, чтобы учесть .top-bar */
+            top: 0; /* Прижимаем к верху */
             left: 10%; /* Смещаем вправо, чтобы оставить место для красной панели */
-            height: calc(100vh - 80px); /* Высота с учётом .top-bar */
+            height: 100vh; /* Высота на всю высоту экрана */
             overflow-y: auto;
             z-index: 600;
             display: none; /* По умолчанию скрыт, показываем в режиме "Чат" */
@@ -536,9 +536,9 @@
             border-radius: 10px 0 0 10px;
             box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
             position: fixed;
-            top: 60px;
+            top: 0;
             left: 10%;
-            height: calc(100vh - 80px);
+            height: 100vh;
             overflow-y: auto;
             z-index: 600;
             display: none; /* По умолчанию скрыт, показываем в режиме "PM" */
@@ -575,9 +575,9 @@
             border-radius: 0 10px 10px 0; /* Радиус только для правой стороны */
             box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
             position: fixed;
-            top: 60px; /* Смещаем вниз, чтобы учесть .top-bar */
+            top: 0; /* Прижимаем к верху */
             right: 0; /* Прижимаем к правому краю */
-            height: calc(100vh - 80px); /* Высота с учётом .top-bar */
+            height: 100vh; /* Высота на всю высоту экрана */
             overflow-y: auto;
             z-index: 600;
             display: none; /* По умолчанию скрыт, показываем в режиме "PM" */
@@ -642,7 +642,6 @@
     
         .pm-panel {
             width: 250px;
-            margin-left: 20px;
             background: var(--panel-bg);
             padding: 15px;
             border-radius: 10px;
@@ -1237,641 +1236,381 @@
     </style>
 </head>
 <body>
-    <div class="auth-container">
-        <h2>Вход / Регистрация</h2>
-        <input id="nickname-input" type="text" placeholder="Твой ник">
-        <input id="password-input" type="password" placeholder="Пароль">
-        <button onclick="auth()">Войти</button> 
+    <div class="tab-switcher" id="tab-switcher">
+        <button class="tab-btn active" onclick="switchTab('chat')">Чат</button>
+        <button class="tab-btn" onclick="switchTab('pm')">Личные сообщения</button>
+    </div>
+
+    <div class="chat-room">
+        <div class="top-bar">
+            <select id="room-select" onchange="joinRoom(this.value)">
+                <option value="room1">Комната 1</option>
+                <option value="room2">Комната 2</option>
+            </select>
+            <button id="toggle-pm-btn" class="admin-btn">💬</button>
+        </div>
+        <div class="chat-container">
+            <div id="messages"></div>
+            <div class="input-container">
+                <input type="text" id="message-input" placeholder="Напишите сообщение...">
+                <button id="emoji-button" onclick="toggleEmojiPicker()">😊</button>
+                <button id="attach-button" onclick="openFileInput()">📎</button>
+                <button onclick="sendMessage()">Отправить</button>
+                <button id="cancel-reply-btn" class="hidden" onclick="cancelReply()">Отменить ответ</button>
+                <input type="file" id="file-input" accept="image/*,video/*,audio/*" style="display: none;" onchange="uploadFile(event)">
+                <div id="upload-progress">
+                    <div id="upload-progress-bar"></div>
+                </div>
+                <emoji-picker id="emoji-picker"></emoji-picker>
+                <div id="typing-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="users-panel" id="users-panel">
+        <h3>Пользователи <span id="user-count">0/0</span></h3>
+        <ul id="users-list"></ul>
+        <div class="admin-controls">
+            <button class="admin-btn" onclick="muteAll()">Заглушить всех</button>
+            <button class="admin-btn" onclick="banAll()">Забанить всех</button>
+        </div>
+    </div>
+
+    <div class="pm-list" id="pm-list">
+        <h3>Личные сообщения</h3>
+        <ul></ul>
+    </div>
+
+    <div class="user-profile" id="user-profile">
+        <div class="profile-header">
+            <img src="/default-avatar.png" alt="User Avatar" class="message-avatar">
+            <div class="profile-info">
+                <h4>Имя пользователя</h4>
+                <div class="status">Онлайн</div>
+                <div class="age">Возраст: 25</div>
+            </div>
+        </div>
+        <div class="achievements"></div>
+        <div class="bio">Биография пользователя...</div>
+    </div>
+
+    <div class="pm-panel hidden" id="pm-panel">
+        <button id="close-pm-btn" class="admin-btn" onclick="togglePMPanel()">Скрыть</button>
+        <h3>Личные сообщения <span id="pm-count">0</span></h3>
+        <select id="pm-recipient" onchange="loadPMHistory()">
+            <option value="">Выберите получателя</option>
+        </select>
+        <input id="pm-message-input" type="text" placeholder="Напишите личное сообщение...">
+        <button onclick="sendPrivateMessage()">Отправить</button>
+        <div id="pm-messages" style="height: 300px; overflow-y: auto; margin-top: 10px; background: var(--panel-bg); padding: 10px; border-radius: 10px;"></div>
+    </div>
+
+    <div class="auth-container hidden" id="auth-container">
+        <h2>Вход в чат</h2>
+        <input type="text" id="nickname-input" placeholder="Ваш никнейм">
+        <input type="password" id="password-input" placeholder="Пароль">
+        <button onclick="login()">Войти</button>
+        <button onclick="register()">Регистрация</button>
         <div id="auth-error"></div>
     </div>
-    <div class="chat-room hidden">
-        <div class="chat-container">
-            <div class="top-bar">
-                <select id="room-select" onchange="joinRoom()">
-                    <option value="room1">Комната 1</option>
-                    <option value="room2">Комната 2</option>
-                    <option value="room3">Комната 3</option>
-                </select>
-                <button id="toggle-users-btn" class="admin-btn" onclick="toggleUsersPanel()">👤</button>
-            </div>
-            <div id="messages">
-                <div id="new-messages-divider"><span>Новые сообщения</span></div>
-            </div>
-            <div class="input-container">
-                <input id="message-input" type="text" placeholder="Напиши сообщение...">
-                <button id="emoji-button">😊</button>
-                <button id="attach-button">📎</button>
-                <input id="file-input" type="file" accept="image/*,video/*,audio/*" style="display: none;">
-                <button onclick="sendMessage()">➤</button>
-                <button id="cancel-reply-btn" class="hidden" onclick="cancelReply()">✖</button>
-                <div id="upload-progress"><div id="upload-progress-bar"></div></div>
-                <div id="new-messages-count">0</div>
-            </div>
-            <div id="typing-status"></div>
-            <emoji-picker id="emoji-picker"></emoji-picker>
-        </div>
-        <div class="users-panel">
-            <button id="close-users-btn" class="admin-btn" onclick="toggleUsersPanel()">Скрыть</button>
-            <h3>Пользователи <span id="user-count">0/0</span></h3>
-            <ul id="users-list"></ul>
-            <div class="admin-controls">
-                <button class="admin-btn hidden" id="clear-chat-btn" onclick="clearChat()">Очистить чат</button>
-                <button class="admin-btn" onclick="logout()">Выйти</button>
-                <button class="admin-btn" id="theme-toggle-btn" onclick="toggleTheme()">Тёмная тема</button>
-            </div>
-        </div>
-        <div class="pm-panel hidden" id="pm-panel">
-            <button id="close-pm-btn" class="admin-btn" onclick="togglePMPanel()">Скрыть</button>
-            <h3>Личные сообщения <span id="pm-count">0</span></h3>
-            <select id="pm-recipient" onchange="loadPMHistory()">
-                <option value="">Выберите получателя</option>
-            </select>
-            <input id="pm-message-input" type="text" placeholder="Напишите личное сообщение...">
-            <button onclick="sendPrivateMessage()">Отправить</button>
-            <div id="pm-messages" style="height: 300px; overflow-y: auto; margin-top: 10px; background: var(--panel-bg); padding: 10px; border-radius: 10px;"></div>
-        </div>
-    </div>
-    <div id="profile-modal" class="modal">
+
+    <div id="notification"></div>
+    <div class="modal" id="profile-modal">
         <div class="modal-content">
-            <button class="close-btn" onclick="closeProfileModal()">✖</button>
+            <img src="/default-avatar.png" alt="User Avatar" class="message-avatar">
             <div class="profile-header">
-                <img id="profile-avatar" src="/default-avatar.png" alt="Avatar">
                 <div class="profile-info">
-                    <h4 id="profile-nickname"></h4>
-                    <p id="profile-age" class="age"></p>
-                    <p id="profile-status" class="status"></p>
+                    <h4 id="profile-nickname">Имя пользователя</h4>
+                    <div class="status" id="profile-status">Онлайн</div>
+                    <div class="age" id="profile-age">Возраст: 25</div>
                 </div>
             </div>
-            <div id="profile-achievements" class="achievements"></div>
-            <div id="profile-bio" class="bio"></div>
-            <button id="edit-profile-btn" class="admin-btn hidden" onclick="showEditForm()">Редактировать</button>
-            <div id="edit-form" class="edit-form">
-                <input type="file" id="edit-avatar" accept="image/*">
-                <input type="number" id="edit-age" placeholder="Возраст (опционально)" min="1" max="150">
-                <textarea id="edit-bio" placeholder="Подпись"></textarea>
+            <div class="achievements" id="profile-achievements"></div>
+            <div class="bio" id="profile-bio">Биография пользователя...</div>
+            <button class="close-btn" onclick="closeModal()">×</button>
+            <div class="edit-form" id="edit-profile-form">
+                <input type="text" id="edit-nickname" placeholder="Новый никнейм">
+                <input type="number" id="edit-age" placeholder="Возраст">
+                <textarea id="edit-bio" placeholder="Биография"></textarea>
                 <button onclick="saveProfile()">Сохранить</button>
                 <button onclick="cancelEdit()">Отмена</button>
             </div>
-            <div id="group-form" class="group-form">
-                <select id="group-select">
-                    <option value="">Выберите роль</option>
-                    <option value="admin">Администратор</option>
-                    <option value="moderator">Модератор</option>
-                </select>
-                <button onclick="assignGroup()">Назначить</button>
-                <button onclick="cancelGroupForm()">Отмена</button>
-            </div>
-            <button id="assign-group-btn" class="admin-btn hidden" onclick="showGroupForm()">Назначить роль</button>
+            <button class="admin-btn" onclick="toggleEditProfile()">Редактировать</button>
         </div>
     </div>
-    <div id="image-modal" class="image-modal">
+
+    <div class="image-modal" id="image-modal">
         <div class="image-modal-content">
-            <button class="close-btn" onclick="closeImageModal()">✖</button>
-            <img id="full-image" src="" alt="Full-size image">
+            <img src="" alt="Image" id="modal-image">
+            <button class="close-btn" onclick="closeImageModal()">×</button>
         </div>
     </div>
-    <div id="preview-modal" class="preview-modal">
-        <div class="preview-modal-content">
-            <button class="close-btn" onclick="closePreviewModal()">✖</button>
-            <div id="preview-content"></div>
-            <div class="preview-buttons">
-                <button onclick="confirmSendMedia()">Отправить</button>
-                <button style="background: var(--delete-btn-bg);" onclick="closePreviewModal()">Отмена</button>
-            </div>
+
+    <div class="preview-modal" id="preview-modal">
+        <div class="preview-modal-content" id="preview-content"></div>
+        <div class="preview-buttons">
+            <button onclick="sendMedia()">Отправить</button>
+            <button onclick="cancelPreview()">Отмена</button>
         </div>
     </div>
-    <div id="notification"></div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/compressorjs/1.2.1/compressor.min.js"></script>
-    <script src="https://unpkg.com/emoji-picker-element@latest/index.js" type="module"></script>
     <script>
-        const socket = io();
-        let currentRoom = "room1";
-        let nickname = "";
-        let replyingTo = null;
+        const socket = io('https://mychat-ap.onrender.com');
+        let nickname = '';
+        let currentRoom = 'room1';
         let userPermissions = {};
-        const IMGBB_API_KEY = "efe6cb0d85e63a7b361c29deed7f2d57";
         let avatarCache = new Map();
-
-        const messageInput = document.getElementById("message-input");
-        const emojiButton = document.getElementById("emoji-button");
-        const attachButton = document.getElementById("attach-button");
-        const fileInput = document.getElementById("file-input");
-        const emojiPicker = document.getElementById("emoji-picker");
-        const nicknameInput = document.getElementById("nickname-input");
-        const passwordInput = document.getElementById("password-input");
-        const chatRoom = document.querySelector(".chat-room");
-        const authContainer = document.querySelector(".auth-container");
-        const authError = document.getElementById("auth-error");
-        const usersList = document.getElementById("users-list");
-        const userCount = document.getElementById("user-count");
-        const adminControls = document.getElementById("admin-controls");
-        const clearChatBtn = document.getElementById("clear-chat-btn");
-        const themeToggleBtn = document.getElementById("theme-toggle-btn");
-        const toggleUsersBtn = document.getElementById("toggle-users-btn");
-        const usersPanel = document.querySelector(".users-panel");
-        const profileModal = document.getElementById("profile-modal");
-        const imageModal = document.getElementById("image-modal");
-        const previewModal = document.getElementById("preview-modal");
-        const previewContent = document.getElementById("preview-content");
-        const fullImage = document.getElementById("full-image");
-        const cancelReplyBtn = document.getElementById("cancel-reply-btn");
-        const uploadProgress = document.getElementById("upload-progress");
-        const uploadProgressBar = document.getElementById("upload-progress-bar");
-        const notification = document.getElementById("notification");
-        const messagesContainer = document.getElementById("messages");
-        const newMessagesCount = document.getElementById("new-messages-count");
-        const newMessagesDivider = document.getElementById("new-messages-divider");
-
-        let currentFile = null;
+        let replyingTo = null;
         let newMessages = 0;
         let lastReadMessageId = null;
-        let titleBlinkInterval = null;
 
-        socket.off("chat message");
-        socket.off("chat history");
-        socket.off("update users");
+        // Инициализация аватарок из localStorage
+        if (localStorage.getItem('avatarCache')) {
+            avatarCache = new Map(JSON.parse(localStorage.getItem('avatarCache')));
+        }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            const cachedAvatars = localStorage.getItem("avatarCache");
-            if (cachedAvatars) {
-                avatarCache = new Map(JSON.parse(cachedAvatars));
-            }
-        });
-
-        // Сохраняем avatarCache в localStorage при изменении
         function saveAvatarCache() {
-            localStorage.setItem("avatarCache", JSON.stringify([...avatarCache.entries()]));
+            localStorage.setItem('avatarCache', JSON.stringify([...avatarCache]));
         }
 
-        if (localStorage.getItem("theme") === "dark") {
-            document.body.classList.add("dark-theme");
-            themeToggleBtn.textContent = "Светлая тема";
-        }
-
-        function toggleTheme() {
-            document.body.classList.toggle("dark-theme");
-            if (document.body.classList.contains("dark-theme")) {
-                localStorage.setItem("theme", "dark");
-                themeToggleBtn.textContent = "Светлая тема";
-            } else {
-                localStorage.setItem("theme", "light");
-                themeToggleBtn.textContent = "Тёмная тема";
-            }
-        }
-
-        function toggleUsersPanel() {
-            usersPanel.classList.toggle("active");
-        }
-
-        function startTitleBlink() {
-            if (!titleBlinkInterval) {
-                titleBlinkInterval = setInterval(() => {
-                    document.title = document.title === "Мой чат" ? "Новое сообщение" : "Мой чат";
-                }, 1500);
-            }
-        }
-
-        function stopTitleBlink() {
-            if (titleBlinkInterval) {
-                clearInterval(titleBlinkInterval);
-                titleBlinkInterval = null;
-                document.title = "Мой чат";
-            }
-        }
-
-        function hideNewMessagesDivider() {
-            if (newMessagesDivider.style.display === "block") {
-                newMessagesDivider.style.transition = "opacity 0.5s ease";
-                newMessagesDivider.style.opacity = "0";
-                setTimeout(() => {
-                    newMessagesDivider.style.display = "none";
-                    newMessagesDivider.style.opacity = "1";
-                }, 500);
-            }
-        }
-
-        function showNewMessagesDivider(lastReadId, firstNewId) {
-            const lastReadMessage = document.querySelector(`[data-message-id="${lastReadId}"]`);
-            const firstNewMessage = document.querySelector(`[data-message-id="${firstNewId}"]`);
-            if (lastReadMessage && firstNewMessage && newMessagesDivider.style.display !== "block") {
-                messagesContainer.insertBefore(newMessagesDivider, firstNewMessage);
-                newMessagesDivider.style.display = "block";
-                setTimeout(hideNewMessagesDivider, 3000);
-            }
-        }
-
-        const token = localStorage.getItem("chatToken");
-        if (token) {
-            socket.emit("auto login", token);
-        }
-
-        function showNotification(message) {
-            notification.textContent = message;
-            notification.style.display = "block";
-            setTimeout(() => {
-                notification.style.display = "none";
-            }, 3000);
-        }
-
-        passwordInput.addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                auth();
-            }
-        });
-
-        function auth() { 
+        function login() {
+            const nicknameInput = document.getElementById('nickname-input');
+            const passwordInput = document.getElementById('password-input');
             const nickname = nicknameInput.value.trim();
             const password = passwordInput.value.trim();
-            if (nickname && password) {
-                socket.emit("auth", { nickname, password });
-            } else {
-                authError.innerText = "Ник и пароль обязательны";
+
+            if (!nickname || !password) {
+                showNotification('Пожалуйста, введите никнейм и пароль');
+                return;
             }
+
+            socket.emit('login', { nickname, password });
         }
 
-        socket.on("auth success", ({ nickname, token, permissions }) => {
-            nickname = nickname;
-            userPermissions = permissions;
-            localStorage.setItem("chatToken", token);
-            authContainer.classList.add("hidden");
-            chatRoom.classList.remove("hidden");
-            if (userPermissions.clearChat) {
-                clearChatBtn.classList.remove("hidden");
+        function register() {
+            const nicknameInput = document.getElementById('nickname-input');
+            const passwordInput = document.getElementById('password-input');
+            const nickname = nicknameInput.value.trim();
+            const password = passwordInput.value.trim();
+
+            if (!nickname || !password) {
+                showNotification('Пожалуйста, введите никнейм и пароль');
+                return;
             }
-            joinRoom();
+
+            socket.emit('register', { nickname, password });
+        }
+
+        socket.on('login success', (data) => {
+            nickname = data.nickname;
+            userPermissions = data.permissions || {};
+            document.getElementById('auth-container').classList.add('hidden');
+            document.querySelector('.chat-room').classList.remove('hidden');
+            joinRoom(currentRoom);
+            loadChatHistory();
+            socket.emit('get avatar', nickname);
+            document.getElementById('profile-nickname').textContent = nickname;
+            document.getElementById('profile-status').textContent = 'Онлайн';
+            updateUsersPanel();
+            switchTab('chat'); // Инициализация в режиме "Чат"
         });
 
-        socket.on("auth error", (message) => {
-            authError.innerText = message;
-            showNotification(message);
-            localStorage.removeItem("chatToken");
+        socket.on('login error', (message) => {
+            document.getElementById('auth-error').textContent = message;
         });
 
-        socket.on("muted", (message) => {
-            showNotification(message);
+        socket.on('register success', () => {
+            showNotification('Регистрация успешна! Теперь войдите.');
         });
 
-        function joinRoom() {
-            currentRoom = document.getElementById("room-select").value;
-            socket.emit("join room", currentRoom);
-            document.getElementById("messages").innerHTML = "";
-            usersPanel.classList.remove("active");
-            newMessages = 0;
-            newMessagesCount.style.display = "none";
-            stopTitleBlink();
-            lastReadMessageId = null;
-            hideNewMessagesDivider();
-        }
+        socket.on('register error', (message) => {
+            document.getElementById('auth-error').textContent = message;
+        });
 
-        function logout() {
-            socket.disconnect();
-            localStorage.removeItem("chatToken");
-            nickname = "";
-            userPermissions = {};
-            chatRoom.classList.add("hidden");
-            authContainer.classList.remove("hidden");
-            nicknameInput.value = "";
-            passwordInput.value = "";
-            authError.innerText = "";
-            clearChatBtn.classList.add("hidden");
-            socket.connect();
-            stopTitleBlink();
-            hideNewMessagesDivider();
-        }
-
-        function compressImage(file) {
-            return new Promise((resolve, reject) => {
-                new Compressor(file, {
-                    quality: 0.8,
-                    maxWidth: 1024,
-                    maxHeight: 1024,
-                    mimeType: 'image/jpeg',
-                    success(result) {
-                        resolve(result);
-                    },
-                    error(err) {
-                        console.error("Ошибка сжатия:", err);
-                        reject(err);
-                    }
-                });
-            });
-        }
-
-        async function uploadToImgBB(file) {
-            let fileToUpload = file;
-            if (file.type.startsWith("image/")) {
-                fileToUpload = await compressImage(file);
+        socket.on('avatar', (data) => {
+            if (data.avatar) {
+                avatarCache.set(nickname, data.avatar);
+                saveAvatarCache();
+                updateMessagesWithAvatars();
             }
+        });
 
-            return new Promise((resolve, reject) => {
-                const formData = new FormData();
-                formData.append("image", fileToUpload);
-                formData.append("key", IMGBB_API_KEY);
-
-                const xhr = new XMLHttpRequest();
-                xhr.open("POST", "https://api.imgbb.com/1/upload", true);
-
-                xhr.upload.onprogress = (event) => {
-                    if (event.lengthComputable) {
-                        const percent = (event.loaded / event.total) * 100;
-                        uploadProgressBar.style.width = `${percent}%`;
-                        uploadProgress.style.display = "block";
-                    }
-                };
-
-                xhr.onload = () => {
-                    uploadProgress.style.display = "none";
-                    uploadProgressBar.style.width = "0%";
-                    if (xhr.status === 200) {
-                        const data = JSON.parse(xhr.responseText);
-                        if (data.success) {
-                            resolve(data.data.url);
-                        } else {
-                            reject(new Error(data.error.message));
-                        }
-                    } else {
-                        reject(new Error("Ошибка загрузки: " + xhr.status));
-                    }
-                };
-
-                xhr.onerror = () => {
-                    uploadProgress.style.display = "none";
-                    uploadProgressBar.style.width = "0%";
-                    reject(new Error("Ошибка сети при загрузке"));
-                };
-
-                xhr.send(formData);
-            });
-        }
-
-        function showPreview(file) {
-            currentFile = file;
-            const fileUrl = URL.createObjectURL(file);
-            previewContent.innerHTML = "";
-            if (file.type.startsWith("image/")) {
-                const img = document.createElement("img");
-                img.src = fileUrl;
-                img.style.maxWidth = "100%";
-                img.style.maxHeight = "80vh";
-                previewContent.appendChild(img);
-            } else if (file.type.startsWith("video/")) {
-                const video = document.createElement("video");
-                video.src = fileUrl;
-                video.controls = true;
-                video.style.maxWidth = "100%";
-                video.style.maxHeight = "80vh";
-                previewContent.appendChild(video);
-            }
-            previewModal.style.display = "flex";
-            if (window.innerWidth <= 768) {
-                previewModal.style.alignItems = "flex-start";
-                previewModal.style.paddingTop = "20px";
-            }
-        }
-
-        function closePreviewModal() {
-            previewModal.style.display = "none";
-            URL.revokeObjectURL(previewContent.querySelector("img, video")?.src);
-            previewContent.innerHTML = "";
-            currentFile = null;
-            fileInput.value = "";
-        }
-
-        async function confirmSendMedia() {
-            if (!currentFile) return;
-            try {
-                const mediaUrl = await uploadToImgBB(currentFile);
-                if (mediaUrl) {
-                    socket.emit("chat message", { 
-                        room: currentRoom, 
-                        msg: messageInput.value.trim(), 
-                        replyTo: replyingTo, 
-                        media: mediaUrl 
-                    });
-                    messageInput.value = "";
-                    replyingTo = null;
-                    messageInput.placeholder = "Напиши сообщение...";
-                    cancelReplyBtn.classList.add("hidden");
-                }
-            } catch (error) {
-                console.error("Ошибка в confirmSendMedia:", error);
-                showNotification("Не удалось загрузить изображение");
-            }
-            closePreviewModal();
+        function joinRoom(room) {
+            currentRoom = room;
+            socket.emit('join room', room);
+            document.getElementById('room-select').value = room;
+            loadChatHistory();
+            updateUsersPanel();
         }
 
         function sendMessage() {
+            const messageInput = document.getElementById('message-input');
             const msg = messageInput.value.trim();
-            const file = fileInput.files[0];
-            if (!msg && !file) return;
-
-            if (file) {
-                if (file.size > 10 * 1024 * 1024) {
-                    showNotification("Файл слишком большой (макс. 10 МБ)");
-                    fileInput.value = "";
-                    return;
-                }
-                showPreview(file);
-            } else {
-                socket.emit("chat message", { 
-                    room: currentRoom, 
-                    msg, 
-                    replyTo: replyingTo 
-                });
-                messageInput.value = "";
+            if (msg) {
+                const messageData = {
+                    room: currentRoom,
+                    msg: msg,
+                    replyTo: replyingTo
+                };
+                socket.emit('chat message', messageData);
+                messageInput.value = '';
                 replyingTo = null;
-                messageInput.placeholder = "Напиши сообщение...";
-                cancelReplyBtn.classList.add("hidden");
-                if (newMessages > 0) {
-                    newMessages = 0;
-                    newMessagesCount.style.display = "none";
-                    lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
-                    stopTitleBlink();
+                document.getElementById('cancel-reply-btn').classList.add('hidden');
+            }
+        }
+
+        socket.on('chat message', (messageData) => {
+            let messages = document.getElementById('messages');
+            if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
+                const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
+                const isFocused = !document.hidden;
+
+                if (messageData.avatar) {
+                    avatarCache.set(messageData.nickname, messageData.avatar);
+                    saveAvatarCache(); // Сохраняем в localStorage
+                }
+                messages.innerHTML += renderMessage(messageData);
+                if (isAtBottom && isFocused) {
+                    messages.scrollTop = messages.scrollHeight;
+                    lastReadMessageId = messageData.messageId;
                     hideNewMessagesDivider();
+                } else {
+                    newMessages++;
+                    document.getElementById('new-messages-count').textContent = newMessages;
+                    document.getElementById('new-messages-count').style.display = 'block';
+                    if (!isFocused) startTitleBlink();
+                    if (lastReadMessageId && document.getElementById('new-messages-divider').style.display !== 'block') {
+                        showNewMessagesDivider(lastReadMessageId, messageData.messageId);
+                    }
                 }
             }
-        }
+        });
 
-        function replyToMessage(messageId) {
-            replyingTo = messageId;
-            const repliedMessage = document.querySelector(`[data-message-id="${messageId}"] p`)?.textContent || "[Медиа]";
-            messageInput.placeholder = `Ответ на: "${repliedMessage.slice(0, 20)}..."`;
-            messageInput.focus();
-            cancelReplyBtn.classList.remove("hidden");
-        }
+        socket.on('announcement', (messageData) => {
+            let messages = document.getElementById('messages');
+            if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
+                const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
+                const isFocused = !document.hidden;
 
-        function cancelReply() {
-            replyingTo = null;
-            messageInput.placeholder = "Напиши сообщение...";
-            cancelReplyBtn.classList.add("hidden");
-        }
-
-        function scrollToMessage(messageId) {
-            const message = document.querySelector(`[data-message-id="${messageId}"]`);
-            if (message) {
-                message.scrollIntoView({ behavior: "smooth", block: "center" });
+                if (messageData.avatar) {
+                    avatarCache.set(messageData.nickname, messageData.avatar);
+                    saveAvatarCache(); // Сохраняем в localStorage
+                }
+                messages.innerHTML += renderMessage(messageData);
+                if (isAtBottom && isFocused) {
+                    messages.scrollTop = messages.scrollHeight;
+                    lastReadMessageId = messageData.messageId;
+                    hideNewMessagesDivider();
+                } else {
+                    newMessages++;
+                    document.getElementById('new-messages-count').textContent = newMessages;
+                    document.getElementById('new-messages-count').style.display = 'block';
+                    if (!isFocused) startTitleBlink();
+                    if (lastReadMessageId && document.getElementById('new-messages-divider').style.display !== 'block') {
+                        showNewMessagesDivider(lastReadMessageId, messageData.messageId);
+                    }
+                }
             }
-        }
+        });
 
-        function deleteMessage(messageId) {
-            socket.emit("delete message", { room: currentRoom, messageId });
-        }
+        socket.on('chat history', (history) => {
+            const messages = document.getElementById('messages');
+            messages.innerHTML = '';
+            history.forEach(message => {
+                messages.innerHTML += renderMessage(message);
+            });
+            messages.scrollTop = messages.scrollHeight;
+            lastReadMessageId = history.length > 0 ? history[history.length - 1].messageId : null;
+            hideNewMessagesDivider();
+            updateMessagesWithAvatars();
+        });
 
-        function clearChat() {
-            if (confirm("Очистить чат?")) {
-                socket.emit("clear chat", currentRoom);
-            }
-        }
-
-        function muteUser(targetUsername) {
-            if (nickname === targetUsername) return;
-            const duration = prompt(`На сколько секунд замутить ${targetUsername}? (например, 60)`);
-            if (duration && !isNaN(duration)) {
-                socket.emit("mute user", { room: currentRoom, targetUsername, duration: parseInt(duration) });
-            }
-        }
-
-        function banUser(targetUsername) {
-            if (nickname === targetUsername) return;
-            if (confirm(`Забанить ${targetUsername}?`)) {
-                socket.emit("ban user", { room: currentRoom, targetUsername });
-            }
-        }
-
-        function showImageModal(src) {
-            fullImage.src = src;
-            imageModal.style.display = "flex";
-        }
-
-        function closeImageModal() {
-            imageModal.style.display = "none";
-            fullImage.src = "";
-        }
-
-        function togglePMPanel() {
-            console.log("togglePMPanel вызвана");
-            const pmPanel = document.getElementById("pm-panel");
-            if (!pmPanel) {
-                console.error("Панель PM не найдена");
+        socket.on('update users', ({ users, onlineUsers, onlineCount, totalCount, room }) => {
+            const usersList = document.getElementById('users-list');
+            usersList.innerHTML = '';
+            if (!users || users.length === 0) {
+                usersList.innerHTML = "<li>Нет пользователей</li>";
+                document.getElementById('user-count').innerText = "0/0";
                 return;
             }
-            pmPanel.classList.toggle("active");
-            console.log("pmPanel.active:", pmPanel.classList.contains("active"), "Стиль display:", pmPanel.style.display, "Стиль visibility:", pmPanel.style.visibility, "Позиция:", pmPanel.getBoundingClientRect());
-            if (pmPanel.classList.contains("active")) {
-                loadPMUsers();
-                updatePMCount(); // Обновляем счётчик при открытии
-                // Проверяем, видима ли панель
-                if (pmPanel.style.display === "none" || pmPanel.style.visibility === "hidden") {
-                    console.warn("Панель PM не видна, проверь стили");
-                }
-                // Проверяем, находится ли панель в видимой области
-                const rect = pmPanel.getBoundingClientRect();
-                if (rect.top < 0 || rect.bottom > window.innerHeight || rect.left < 0 || rect.right > window.innerWidth) {
-                    console.warn("Панель PM вне видимой области, корректируй стили");
-                }
+
+            if (!Array.isArray(users)) {
+                console.error("users не является массивом:", users);
+                return;
             }
-        }
 
-        function loadPMUsers() {
-            const select = document.getElementById("pm-recipient");
-            select.innerHTML = '<option value="">Выберите получателя</option>';
-            socket.emit("get all users for pm");
-        }
+            users.sort((a, b) => {
+                const isAOnline = onlineUsers.includes(a.nickname);
+                const isBOnline = onlineUsers.includes(b.nickname);
+                return isBOnline - isAOnline; // Онлайн (true = 1) вверху, оффлайн (false = 0) внизу
+            });
 
-        socket.on("all users for pm", (users) => {
-            const select = document.getElementById("pm-recipient");
             users.forEach(user => {
-                if (user.nickname !== nickname) { // Не показываем себя
-                    const option = document.createElement("option");
-                    option.value = user.nickname;
-                    option.textContent = user.nickname;
-                    select.appendChild(option);
+                if (!user || !user.nickname) return;
+                if (onlineUsers.includes(user.nickname)) {
+                    const li = document.createElement("li");
+                    const avatarImg = document.createElement("img");
+                    avatarImg.src = user.avatar || "/default-avatar.png";
+                    avatarImg.className = "user-avatar";
+                    avatarImg.alt = `${user.nickname}'s avatar`;
+                    const nameSpan = document.createElement("span");
+                    nameSpan.textContent = user.nickname;
+                    li.appendChild(avatarImg);
+                    li.appendChild(nameSpan);
+                    li.onclick = () => showProfile(user.nickname);
+                    const isOnline = onlineUsers.includes(user.nickname);
+                    if (!isOnline) li.classList.add("offline");
+                    if (user.nickname.toLowerCase() === "admin") {
+                        nameSpan.style.color = isOnline ? "#D32F2F" : "#999";
+                    }
+                    if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
+                        if (userPermissions.muteUsers) {
+                            const muteIcon = document.createElement("button");
+                            muteIcon.innerHTML = "🔇";
+                            muteIcon.className = "admin-icon";
+                            muteIcon.title = "Мут";
+                            muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.nickname); };
+                            li.appendChild(muteIcon);
+                        }
+                        if (userPermissions.banUsers) {
+                            const banIcon = document.createElement("button");
+                            banIcon.innerHTML = "🚫";
+                            banIcon.className = "admin-icon";
+                            banIcon.title = "Бан";
+                            banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.nickname); };
+                            li.appendChild(banIcon);
+                        }
+                    }
+                    usersList.appendChild(li);
+                    avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
                 }
             });
+            document.getElementById('user-count').innerText = `${onlineCount}/${totalCount}`;
         });
 
-        function sendPrivateMessage() {
-            const recipientNickname = document.getElementById("pm-recipient").value;
-            const message = document.getElementById("pm-message-input").value.trim();
-            if (recipientNickname && message) {
-                socket.emit("send private message", { recipientNickname, message });
-                document.getElementById("pm-message-input").value = "";
-            } else {
-                showNotification("Выберите получателя и введите сообщение");
-            }
-        }
-
-        socket.on("private message sent", (messageData) => {
-            showNotification(`Сообщение отправлено ${messageData.recipientNickname}`);
-            loadPMHistory();
+        socket.on('user muted', (data) => {
+            showNotification(`${data.nickname} заглушен на ${data.duration / 1000} секунд`);
         });
 
-        socket.on("new private message", (messageData) => {
-            showNotification(`Новое личное сообщение от ${messageData.senderNickname}`);
-            if (document.getElementById("pm-recipient").value === messageData.senderNickname) {
-                loadPMHistory();
-            }
-            updatePMCount(); // Обновляем счётчик при новом сообщении
+        socket.on('user banned', (data) => {
+            showNotification(`${data.nickname} забанен`);
         });
 
-        socket.on("private message error", (message) => {
+        socket.on('muted', (message) => {
             showNotification(message);
         });
 
-        function loadPMHistory() {
-            const recipientNickname = document.getElementById("pm-recipient").value;
-            if (recipientNickname) {
-                socket.emit("get private message history", recipientNickname);
-                socket.emit("mark private message as read", recipientNickname);
-            }
-        }
-
-        socket.on("private message history", (history) => {
-            const pmMessages = document.getElementById("pm-messages");
-            pmMessages.innerHTML = "";
-            history.forEach(msg => {
-                const div = document.createElement("div");
-                div.className = "pm-message";
-                const isOwn = msg.senderNickname === nickname;
-                div.innerHTML = `<strong>${msg.senderNickname}</strong> (${msg.timestamp}): ${msg.message} ${!msg.read && !isOwn ? '<span style="color: #4A90E2;">(непрочитанное)</span>' : ''}`;
-                pmMessages.appendChild(div);
-            });
-            pmMessages.scrollTop = pmMessages.scrollHeight;
-            updatePMCount();
+        socket.on('banned', () => {
+            showNotification('Вы были забанены и отключены от чата');
+            socket.disconnect();
+            document.querySelector('.chat-room').classList.add('hidden');
+            document.getElementById('auth-container').classList.remove('hidden');
         });
 
-        function updatePMCount() {
-            socket.emit("get unread pm count");
-        }
-
-        socket.on("unread pm count", (count) => {
-            document.getElementById("pm-count").textContent = count;
-            // Показываем уведомление, если есть непрочитанные сообщения
-            if (count > 0 && !document.getElementById("pm-panel").classList.contains("active")) {
-                showNotification(`У вас ${count} непрочитанных личных сообщений`);
-            }
-        });
-
-        // Добавь кнопку для открытия PM в топ-баре
-        document.addEventListener("DOMContentLoaded", () => {
-            const topBar = document.querySelector(".top-bar");
-            if (topBar && !document.getElementById("toggle-pm-btn")) {
-                const pmButton = document.createElement("button");
-                pmButton.id = "toggle-pm-btn";
-                pmButton.className = "admin-btn";
-                pmButton.onclick = togglePMPanel;
-                pmButton.innerHTML = "💬";
-                topBar.appendChild(pmButton);
-            }
-        });
-
-        // Убедимся, что уведомление о новом PM обновляет счётчик
-        document.addEventListener("visibilitychange", () => {
-            if (!document.hidden) {
-                updatePMCount();
-            }
+        socket.on('typing', (data) => {
+            document.getElementById('typing-status').textContent = `${data.nickname} печатает...`;
+            setTimeout(() => document.getElementById('typing-status').textContent = '', 2000);
         });
 
         function renderMessage({ type, nickname: msgNickname, msg, timestamp, messageId, replyTo, media, avatar }) {
@@ -1930,372 +1669,443 @@
             `;
         }
 
-        socket.on("chat history", (history) => {
-            let messages = document.getElementById("messages");
-            messages.innerHTML = "";
-            history.forEach(message => {
-                if (message.avatar) {
-                    avatarCache.set(message.nickname, message.avatar);
-                    saveAvatarCache(); // Сохраняем в localStorage
-                }
-                messages.innerHTML += renderMessage(message);
-            });
-            messages.scrollTop = messages.scrollHeight;
-            lastReadMessageId = history.length > 0 ? history[history.length - 1].messageId : null;
-            hideNewMessagesDivider();
-        });
-
-        socket.on("chat message", (messageData) => {
-            let messages = document.getElementById("messages");
-            // Проверяем, что messageData существует и содержит необходимые поля
-            if (!messageData || !messageData.messageId) {
-                console.error("Получено некорректное сообщение:", messageData);
-                return;
-            }
-            if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
-                const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
-                const isFocused = !document.hidden;
-
-                // Проверяем наличие nickname перед использованием
-                if (messageData.avatar && messageData.nickname) {
-                    avatarCache.set(messageData.nickname, messageData.avatar);
-                    saveAvatarCache(); // Сохраняем в localStorage
-                }
-                messages.innerHTML += renderMessage(messageData);
-                if (isAtBottom && isFocused) {
-                    messages.scrollTop = messages.scrollHeight;
-                    lastReadMessageId = messageData.messageId;
-                    hideNewMessagesDivider();
+        function updateMessagesWithAvatars() {
+            const messages = document.querySelectorAll('.message, .announcement');
+            messages.forEach(message => {
+                const nickname = message.querySelector('.username').textContent.split(' [')[0];
+                const avatarImg = message.querySelector('.message-avatar');
+                if (avatarCache.has(nickname)) {
+                    avatarImg.src = avatarCache.get(nickname);
                 } else {
-                    newMessages++;
-                    newMessagesCount.textContent = newMessages;
-                    newMessagesCount.style.display = "block";
-                    if (!isFocused) startTitleBlink();
-                    if (lastReadMessageId && newMessagesDivider.style.display !== "block") {
-                        showNewMessagesDivider(lastReadMessageId, messageData.messageId);
-                    }
-                }
-            }
-        });
-
-        socket.on("announcement", (messageData) => {
-            let messages = document.getElementById("messages");
-            if (!document.querySelector(`[data-message-id="${messageData.messageId}"]`)) {
-                const isAtBottom = messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 10;
-                const isFocused = !document.hidden;
-
-                messages.innerHTML += renderMessage(messageData);
-                if (isAtBottom && isFocused) {
-                    messages.scrollTop = messages.scrollHeight;
-                    lastReadMessageId = messageData.messageId;
-                    hideNewMessagesDivider();
-                } else {
-                    newMessages++;
-                    newMessagesCount.textContent = newMessages;
-                    newMessagesCount.style.display = "block";
-                    if (!isFocused) startTitleBlink();
-                    if (lastReadMessageId && newMessagesDivider.style.display !== "block") {
-                        showNewMessagesDivider(lastReadMessageId, messageData.messageId);
-                    }
-                }
-            }
-        });
-
-        messagesContainer.addEventListener("scroll", () => {
-            const isAtBottom = messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 10;
-            if (isAtBottom && newMessages > 0) {
-                newMessages = 0;
-                newMessagesCount.style.display = "none";
-                lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
-                stopTitleBlink();
-                hideNewMessagesDivider();
-            }
-        });
-
-        document.addEventListener("visibilitychange", () => {
-            if (!document.hidden) {
-                stopTitleBlink();
-                if (messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 10) {
-                    newMessages = 0;
-                    newMessagesCount.style.display = "none";
-                    lastReadMessageId = messagesContainer.lastElementChild?.dataset.messageId || lastReadMessageId;
-                    hideNewMessagesDivider();
-                }
-            }
-        });
-
-        socket.on("message deleted", (messageId) => {
-            const message = document.querySelector(`[data-message-id="${messageId}"]`);
-            if (message) message.remove();
-        });
-
-        socket.on("chat cleared", () => {
-            document.getElementById("messages").innerHTML = "";
-            newMessages = 0;
-            newMessagesCount.style.display = "none";
-            lastReadMessageId = null;
-            stopTitleBlink();
-            hideNewMessagesDivider();
-        });
-
-        socket.on("user muted", ({ nickname, duration }) => {
-            showNotification(`${nickname} замучен на ${duration} секунд`);
-        });
-
-        socket.on("user banned", (nickname) => {
-            showNotification(`${nickname} забанен`);
-        });
-
-        socket.on("update users", ({ users, onlineUsers, onlineCount, totalCount, room }) => {
-            usersList.innerHTML = "";
-            if (!users || users.length === 0) {
-                usersList.innerHTML = "<li>Нет пользователей</li>";
-                userCount.innerText = "0/0";
-                return;
-            }
-
-            if (!Array.isArray(users)) {
-                console.error("users не является массивом:", users);
-                return;
-            }
-
-        // Сортируем пользователей: онлайн вверху, оффлайн внизу
-            users.sort((a, b) => {
-                const isAOnline = onlineUsers.includes(a.nickname);
-                const isBOnline = onlineUsers.includes(b.nickname);
-                return isBOnline - isAOnline; // Онлайн (true = 1) вверху, оффлайн (false = 0) внизу
-            });
-
-            users.forEach(user => {
-                if (!user || !user.nickname) return;
-                // Проверяем, находится ли пользователь в текущей комнате
-                if (onlineUsers.includes(user.nickname)) {
-                    const li = document.createElement("li");
-                    const avatarImg = document.createElement("img");
-                    avatarImg.src = user.avatar || "/default-avatar.png";
-                    avatarImg.className = "user-avatar";
-                    avatarImg.alt = `${user.nickname}'s avatar`;
-                    const nameSpan = document.createElement("span");
-                    nameSpan.textContent = user.nickname;
-                    li.appendChild(avatarImg);
-                    li.appendChild(nameSpan);
-                    li.onclick = () => showProfile(user.nickname);
-                    const isOnline = onlineUsers.includes(user.nickname);
-                    if (!isOnline) li.classList.add("offline");
-                    if (user.nickname.toLowerCase() === "admin") {
-                        nameSpan.style.color = isOnline ? "#D32F2F" : "#999";
-                    }
-                    if ((userPermissions.muteUsers || userPermissions.banUsers) && isOnline) {
-                        if (userPermissions.muteUsers) {
-                            const muteIcon = document.createElement("button");
-                            muteIcon.innerHTML = "🔇";
-                            muteIcon.className = "admin-icon";
-                            muteIcon.title = "Мут";
-                            muteIcon.onclick = (e) => { e.stopPropagation(); muteUser(user.nickname); };
-                            li.appendChild(muteIcon);
-                        }
-                        if (userPermissions.banUsers) {
-                            const banIcon = document.createElement("button");
-                            banIcon.innerHTML = "🚫";
-                            banIcon.className = "admin-icon";
-                            banIcon.title = "Бан";
-                            banIcon.onclick = (e) => { e.stopPropagation(); banUser(user.nickname); };
-                            li.appendChild(banIcon);
-                        }
-                    }
-                    usersList.appendChild(li);
-                    avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
+                    avatarImg.src = "/default-avatar.png";
                 }
             });
-            userCount.innerText = `${onlineCount}/${totalCount}`;
-        });
+        }
 
-        socket.on("update users avatars", (users) => {
-            users.forEach(user => {
-                if (!user || !user.nickname) return;
-                avatarCache.set(user.nickname, user.avatar || "/default-avatar.png");
-                document.querySelectorAll(`.message-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
-                    img.src = user.avatar || "/default-avatar.png";
-                });
-                document.querySelectorAll(`.user-avatar[alt="${user.nickname}'s avatar"]`).forEach(img => {
-                    img.src = user.avatar || "/default-avatar.png";
-                });
-            });
-        });
+        function switchTab(tab) {
+            const tabSwitcher = document.getElementById("tab-switcher");
+            const usersPanel = document.getElementById("users-panel");
+            const pmList = document.getElementById("pm-list");
+            const userProfile = document.getElementById("user-profile");
 
-        let typingTimeout;
-        messageInput.addEventListener("input", () => {
-            socket.emit("typing", currentRoom);
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                socket.emit("stop typing", currentRoom);
-            }, 1000);
-        });
+            // Устанавливаем активную вкладку
+            tabSwitcher.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+            document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add("active");
 
-        socket.on("typing", (nickname) => {
-            document.getElementById("typing-status").textContent = `${nickname} пишет...`;
-        });
+            // Показываем/скрываем панели в зависимости от режима
+            if (tab === "chat") {
+                // Режим "Чат"
+                usersPanel.classList.add("active");
+                pmList.classList.remove("active");
+                userProfile.classList.remove("active");
+                // Убедимся, что показываем текущую комнату
+                const currentRoom = document.getElementById("room-select").value || "room1";
+                socket.emit("join room", currentRoom);
+                socket.emit("leave private chat");
+            } else if (tab === "pm") {
+                // Режим "Личные сообщения"
+                usersPanel.classList.remove("active");
+                pmList.classList.add("active");
+                userProfile.classList.remove("active"); // Скрываем профиль по умолчанию, пока не выбран пользователь
+                socket.emit("leave room", currentRoom);
+                socket.emit("get all users for pm");
+                loadPMUsers();
+            }
 
-        socket.on("stop typing", () => {
-            document.getElementById("typing-status").textContent = "";
-        });
+            // Обновляем интерфейс
+            updateInterface();
+        }
 
-        messageInput.addEventListener("keypress", function(event) {
-            if (event.key === "Enter") sendMessage();
-        });
-
-        emojiButton.addEventListener("click", () => {
-            const isVisible = emojiPicker.style.display === "block";
-            emojiPicker.style.display = isVisible ? "none" : "block";
-            if (window.innerWidth <= 768) {
-                emojiPicker.style.bottom = "80px"; // Убедимся, что не перекрывается клавиатурой
-                emojiPicker.style.left = "5px";
-                emojiPicker.style.width = "calc(100% - 10px)";
-                emojiPicker.style.maxHeight = "200px";
+        function updateInterface() {
+            const tab = document.querySelector(".tab-btn.active").getAttribute("onclick").match(/'([^']+)'/)[1];
+            if (tab === "pm") {
+                document.getElementById("pm-panel").classList.add("active");
+                document.getElementById("users-panel").classList.remove("active");
             } else {
-                emojiPicker.style.top = `${messageInput.offsetTop - 300}px`;
-                emojiPicker.style.left = `${messageInput.offsetLeft}px`;
-                emojiPicker.style.width = "auto";
-                emojiPicker.style.maxHeight = "400px";
+                document.getElementById("pm-panel").classList.remove("active");
+                document.getElementById("users-panel").classList.add("active");
             }
-        });
-
-        emojiPicker.addEventListener("emoji-click", (event) => {
-            messageInput.value += event.detail.unicode;
-            emojiPicker.style.display = "none";
-            messageInput.focus();
-            if (window.innerWidth <= 768) {
-                emojiPicker.style.bottom = "-1000px"; // Скрываем за экраном
-            }
-        });
-
-        attachButton.addEventListener("click", () => {
-            fileInput.click();
-        });
-
-        fileInput.addEventListener("change", () => {
-            if (fileInput.files.length > 0) sendMessage();
-        });
-
-        messageInput.addEventListener("paste", async (event) => {
-            const items = (event.clipboardData || event.originalEvent.clipboardData).items;
-            for (const item of items) {
-                if (item.type.indexOf("image") === 0) {
-                    const blob = item.getAsFile();
-                    if (blob.size > 10 * 1024 * 1024) {
-                        showNotification("Изображение слишком большое (макс. 10 МБ)");
-                        return;
-                    }
-                    showPreview(blob);
-                    event.preventDefault();
-                    break;
-                }
-            }
-        });
-
-        function showProfile(targetUsername) {
-            socket.emit("get profile", targetUsername);
         }
 
-        socket.on("profile data", ({ nickname, avatar, age, last_seen, bio, achievements, role, isOwnProfile, canAssignGroups }) => {
-            if (!nickname) {
-                showNotification("Профиль не найден");
+        // Инициализация при загрузке
+        document.addEventListener("DOMContentLoaded", () => {
+            switchTab("chat"); // По умолчанию открываем режим "Чат"
+            const pmList = document.querySelector(".pm-list");
+            if (pmList) {
+                pmList.addEventListener("click", (e) => {
+                    if (e.target.tagName === "LI") {
+                        const nickname = e.target.textContent;
+                        document.getElementById("pm-recipient").value = nickname;
+                        loadPMHistory();
+                        pmList.classList.remove("active");
+                        document.getElementById("user-profile").classList.add("active");
+                    }
+                });
+            }
+        });
+
+        toggleUsersPanel(); {
+            const usersPanel = document.getElementById('users-panel');
+            usersPanel.classList.toggle('active');
+        }
+
+        function togglePMPanel() {
+            console.log("togglePMPanel вызвана");
+            const pmPanel = document.getElementById("pm-panel");
+            if (!pmPanel) {
+                console.error("Панель PM не найдена");
                 return;
             }
-            document.getElementById("profile-nickname").textContent = nickname;
-            document.getElementById("profile-avatar").src = avatar || "/default-avatar.png";
-            document.getElementById("profile-age").textContent = age ? `Возраст: ${age}` : "";
-            const statusEl = document.getElementById("profile-status");
-            const isOnline = Array.from(usersList.querySelectorAll("li:not(.offline)")).some(li => li.textContent.includes(nickname));
-            statusEl.className = "status " + (isOnline ? "online" : "offline");
-            statusEl.textContent = isOnline ? "Онлайн" : `Последний раз: ${new Date(last_seen).toLocaleString()}`;
-            const achievementsEl = document.getElementById("profile-achievements");
-            achievementsEl.innerHTML = "";
-            achievements.forEach(ach => {
-                const span = document.createElement("span");
-                span.className = "achievement";
-                span.textContent = ach;
-                achievementsEl.appendChild(span);
-            });
-            if (role && role !== 'user') {
-                const span = document.createElement("span");
-                span.className = "achievement";
-                span.textContent = role === 'admin' ? "Администратор" : "Модератор";
-                span.style = `
-                    background: var(--panel-bg);
-                    padding: 6px 12px;
-                    border-radius: 20px;
-                    font-size: 0.85em;
-                    color: ${role === 'admin' ? "#FF0000" : "#9B59B6"};
-                    font-weight: 500;
-                    box-shadow: 0 2px 5px var(--shadow-color);`;
-                achievementsEl.appendChild(span);
+            pmPanel.classList.toggle("active");
+            console.log("pmPanel.active:", pmPanel.classList.contains("active"), "Стиль display:", window.getComputedStyle(pmPanel).display, "Стиль visibility:", window.getComputedStyle(pmPanel).visibility, "Позиция:", pmPanel.getBoundingClientRect());
+            if (pmPanel.classList.contains("active")) {
+                loadPMUsers();
+                updatePMCount(); // Обновляем счётчик при открытии
+                const rect = pmPanel.getBoundingClientRect();
+                if (rect.top < 0 || rect.bottom > window.innerHeight || rect.left < 0 || rect.right > window.innerWidth) {
+                    console.warn("Панель PM вне видимой области, корректируй стили");
+                    pmPanel.style.left = "30%"; // Смещаем влево, чтобы соответствовать синей панели
+                }
             }
-            document.getElementById("profile-bio").textContent = bio || "Нет подписи";
-            const editBtn = document.getElementById("edit-profile-btn");
-            editBtn.style.display = isOwnProfile ? "block" : "none";
-            const assignBtn = document.getElementById("assign-group-btn");
-            assignBtn.style.display = canAssignGroups ? "block" : "none";
-            profileModal.style.display = "flex";
-        });
-
-        function closeProfileModal() {
-            profileModal.style.display = "none";
-            document.getElementById("edit-form").style.display = "none";
-            document.getElementById("group-form").style.display = "none";
         }
 
-        function showEditForm() {
-            document.getElementById("edit-form").style.display = "block";
-            document.getElementById("edit-age").value = document.getElementById("profile-age").textContent.replace("Возраст: ", "") || "";
-            document.getElementById("edit-bio").value = document.getElementById("profile-bio").textContent === "Нет подписи" ? "" : document.getElementById("profile-bio").textContent;
+        function loadPMUsers() {
+            const select = document.getElementById("pm-recipient");
+            select.innerHTML = '<option value="">Выберите получателя</option>';
+            socket.emit("get all users for pm");
+        }
+
+        socket.on("all users for pm", (users) => {
+            const pmList = document.querySelector(".pm-list");
+            const select = document.getElementById("pm-recipient");
+            if (pmList) {
+                pmList.innerHTML = '<h3>Личные сообщения</h3><ul></ul>';
+                const ul = pmList.querySelector("ul");
+                users.forEach(user => {
+                    if (user.nickname !== nickname) { // Не показываем себя
+                        const li = document.createElement("li");
+                        li.textContent = user.nickname;
+                        li.onclick = () => {
+                            document.getElementById("pm-recipient").value = user.nickname;
+                            loadPMHistory();
+                            pmList.classList.remove("active");
+                            document.querySelector(".user-profile").classList.add("active");
+                        };
+                        ul.appendChild(li);
+                        const option = document.createElement("option");
+                        option.value = user.nickname;
+                        option.textContent = user.nickname;
+                        select.appendChild(option);
+                    }
+                });
+            }
+        });
+
+        function sendPrivateMessage() {
+            const recipientNickname = document.getElementById("pm-recipient").value;
+            const message = document.getElementById("pm-message-input").value.trim();
+            if (recipientNickname && message) {
+                socket.emit("send private message", { recipientNickname, message });
+                document.getElementById("pm-message-input").value = "";
+            } else {
+                showNotification("Выберите получателя и введите сообщение");
+            }
+        }
+
+        socket.on("private message sent", (messageData) => {
+            showNotification(`Сообщение отправлено ${messageData.recipientNickname}`);
+            loadPMHistory();
+        });
+
+        socket.on("new private message", (messageData) => {
+            showNotification(`Новое личное сообщение от ${messageData.senderNickname}`);
+            if (document.getElementById("pm-recipient").value === messageData.senderNickname) {
+                loadPMHistory();
+            }
+            updatePMCount();
+        });
+
+        socket.on("private message error", (message) => {
+            showNotification(message);
+        });
+
+        function loadPMHistory() {
+            const recipientNickname = document.getElementById("pm-recipient").value;
+            if (recipientNickname) {
+                socket.emit("get private message history", recipientNickname);
+                socket.emit("mark private message as read", recipientNickname);
+            }
+        }
+
+        socket.on("private message history", (history) => {
+            const pmMessages = document.getElementById("pm-messages");
+            pmMessages.innerHTML = "";
+            history.forEach(msg => {
+                const div = document.createElement("div");
+                div.className = "pm-message";
+                const isOwn = msg.senderNickname === nickname;
+                div.innerHTML = `<strong>${msg.senderNickname}</strong> (${msg.timestamp}): ${msg.message} ${!msg.read && !isOwn ? '<span style="color: #4A90E2;">(непрочитанное)</span>' : ''}`;
+                pmMessages.appendChild(div);
+            });
+            pmMessages.scrollTop = pmMessages.scrollHeight;
+            updatePMCount();
+        });
+
+        function updatePMCount() {
+            socket.emit("get unread pm count");
+        }
+
+        socket.on("unread pm count", (count) => {
+            document.getElementById("pm-count").textContent = count;
+            if (count > 0 && !document.getElementById("pm-panel").classList.contains("active")) {
+                showNotification(`У вас ${count} непрочитанных личных сообщений`);
+            }
+        });
+
+        function showProfile(nickname) {
+            socket.emit('get user profile', nickname);
+        }
+
+        socket.on('user profile', (profile) => {
+            document.getElementById('profile-nickname').textContent = profile.nickname;
+            document.getElementById('profile-status').textContent = profile.status || 'Оффлайн';
+            document.getElementById('profile-age').textContent = `Возраст: ${profile.age || 'Не указан'}`;
+            document.getElementById('profile-bio').textContent = profile.bio || 'Биография не указана';
+            document.querySelector('#profile-modal .modal-content img').src = profile.avatar || '/default-avatar.png';
+            document.getElementById('profile-achievements').innerHTML = '';
+            if (profile.achievements) {
+                profile.achievements.forEach(achievement => {
+                    const div = document.createElement('div');
+                    div.className = 'achievement';
+                    div.textContent = achievement;
+                    document.getElementById('profile-achievements').appendChild(div);
+                });
+            }
+            document.getElementById('profile-modal').style.display = 'flex';
+        });
+
+        function closeModal() {
+            document.getElementById('profile-modal').style.display = 'none';
+        }
+
+        function toggleEditProfile() {
+            const editForm = document.getElementById('edit-profile-form');
+            editForm.style.display = editForm.style.display === 'none' ? 'block' : 'none';
         }
 
         function saveProfile() {
-            const avatarFile = document.getElementById("edit-avatar").files[0];
-            const age = document.getElementById("edit-age").value;
-            const bio = document.getElementById("edit-bio").value;
-
-            if (avatarFile) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    socket.emit("update profile", { avatar: reader.result, age: age || null, bio });
-                };
-                reader.readAsDataURL(avatarFile);
-            } else {
-                socket.emit("update profile", { avatar: null, age: age || null, bio });
+            const nickname = document.getElementById('edit-nickname').value.trim();
+            const age = document.getElementById('edit-age').value.trim();
+            const bio = document.getElementById('edit-bio').value.trim();
+            if (nickname || age || bio) {
+                socket.emit('update profile', { nickname, age, bio });
+                closeModal();
             }
-            closeProfileModal();
         }
-
-        socket.on("profile updated", (message) => {
-            showProfile(nickname);
-        });
 
         function cancelEdit() {
-            document.getElementById("edit-form").style.display = "none";
+            document.getElementById('edit-profile-form').style.display = 'none';
         }
 
-        function showGroupForm() {
-            document.getElementById("group-form").style.display = "block";
-        }
-
-        function assignGroup() {
-            const role = document.getElementById("group-select").value;
-            if (role) {
-                socket.emit("assign group", { targetUsername: document.getElementById("profile-nickname").textContent, role });
-            }
-            closeProfileModal();
-        }
-
-        socket.on("group assigned", (message) => {
-            showNotification(message);
-            showProfile(document.getElementById("profile-nickname").textContent);
+        socket.on('profile updated', (profile) => {
+            showNotification('Профиль обновлён');
+            showProfile(profile.nickname);
         });
 
-        function cancelGroupForm() {
-            document.getElementById("group-form").style.display = "none";
+        function muteUser(nickname) {
+            socket.emit('mute user', { nickname, duration: 300000 }); // 5 минут
         }
+
+        function banUser(nickname) {
+            socket.emit('ban user', nickname);
+        }
+
+        function muteAll() {
+            socket.emit('mute all', currentRoom);
+        }
+
+        function banAll() {
+            socket.emit('ban all', currentRoom);
+        }
+
+        function deleteMessage(messageId) {
+            socket.emit('delete message', { messageId, room: currentRoom });
+        }
+
+        socket.on('message deleted', (messageId) => {
+            const message = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (message) {
+                message.querySelector('p').textContent = 'Сообщение удалено';
+                message.querySelectorAll('.delete-btn, .reply-btn').forEach(btn => btn.remove());
+            }
+        });
+
+        function replyToMessage(messageId) {
+            replyingTo = messageId;
+            const message = document.querySelector(`[data-message-id="${messageId}"] .username`).textContent + ': ' + 
+                (document.querySelector(`[data-message-id="${messageId}"] p`)?.textContent || "[Медиа]");
+            document.getElementById('message-input').value = `@${message}\n`;
+            document.getElementById('cancel-reply-btn').classList.remove('hidden');
+        }
+
+        function cancelReply() {
+            replyingTo = null;
+            document.getElementById('message-input').value = '';
+            document.getElementById('cancel-reply-btn').classList.add('hidden');
+        }
+
+        function scrollToMessage(messageId) {
+            const message = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (message) {
+                message.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => notification.style.display = 'none', 5000);
+        }
+
+        function startTitleBlink() {
+            let originalTitle = document.title;
+            let blink = setInterval(() => {
+                document.title = document.title === "Новое сообщение!" ? originalTitle : "Новое сообщение!";
+            }, 1000);
+            document.addEventListener('visibilitychange', function () {
+                if (!document.hidden) {
+                    clearInterval(blink);
+                    document.title = originalTitle;
+                    newMessages = 0;
+                    document.getElementById('new-messages-count').style.display = 'none';
+                    updatePMCount();
+                }
+            });
+        }
+
+        function showNewMessagesDivider(lastId, newId) {
+            const messages = document.getElementById('messages');
+            const lastMessage = document.querySelector(`[data-message-id="${lastId}"]`);
+            const newMessage = document.querySelector(`[data-message-id="${newId}"]`);
+            if (lastMessage && newMessage) {
+                const divider = document.createElement('div');
+                divider.id = 'new-messages-divider';
+                divider.innerHTML = '<span>Новые сообщения</span>';
+                messages.insertBefore(divider, newMessage);
+            }
+        }
+
+        function hideNewMessagesDivider() {
+            const divider = document.getElementById('new-messages-divider');
+            if (divider) divider.style.display = 'none';
+        }
+
+        function toggleEmojiPicker() {
+            const emojiPicker = document.getElementById('emoji-picker');
+            emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function openFileInput() {
+            document.getElementById('file-input').click();
+        }
+
+        function uploadFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                const progressBar = document.getElementById('upload-progress-bar');
+                const progress = document.getElementById('upload-progress');
+                progress.style.display = 'block';
+                let uploadedBytes = 0;
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload', true);
+
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        uploadedBytes = e.loaded;
+                        const percent = (e.loaded / e.total) * 100;
+                        progressBar.style.width = percent + '%';
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.url) {
+                            previewMedia(response.url);
+                        }
+                    }
+                    progress.style.display = 'none';
+                    progressBar.style.width = '0%';
+                };
+
+                xhr.onerror = () => {
+                    showNotification('Ошибка загрузки файла');
+                    progress.style.display = 'none';
+                    progressBar.style.width = '0%';
+                };
+
+                xhr.send(formData);
+            }
+        }
+
+        function previewMedia(url) {
+            const previewContent = document.getElementById('preview-content');
+            if (url.match(/\.(jpeg|jpg|png|gif)$/i)) {
+                previewContent.innerHTML = `<img src="${url}" alt="Preview image">`;
+            } else if (url.match(/\.(mp4|webm)$/i)) {
+                previewContent.innerHTML = `<video controls src="${url}"></video>`;
+            } else if (url.match(/\.(mp3|wav)$/i)) {
+                previewContent.innerHTML = `<audio controls src="${url}"></audio>`;
+            }
+            document.getElementById('preview-modal').style.display = 'flex';
+        }
+
+        function sendMedia() {
+            const url = document.querySelector('#preview-content img, #preview-content video, #preview-content audio').src || document.querySelector('#preview-content audio').src;
+            if (url) {
+                const messageData = {
+                    room: currentRoom,
+                    msg: "[Медиа]",
+                    media: url,
+                    replyTo: replyingTo
+                };
+                socket.emit('chat message', messageData);
+                document.getElementById('preview-modal').style.display = 'none';
+                replyingTo = null;
+                document.getElementById('cancel-reply-btn').classList.add('hidden');
+            }
+        }
+
+        function cancelPreview() {
+            document.getElementById('preview-modal').style.display = 'none';
+        }
+
+        function showImageModal(url) {
+            document.getElementById('modal-image').src = url;
+            document.getElementById('image-modal').style.display = 'flex';
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-modal').style.display = 'none';
+        }
+
+        // Добавляем событие для переключения темы
+        document.getElementById('toggle-theme-btn')?.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+        });
+
+        // Устанавливаем тему при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+            }
+        });
     </script>
 </body>
 </html>
