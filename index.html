@@ -31,7 +31,7 @@
             --announcement-border: #7E57C2;
             --scrollbar-thumb: #9B59B6;
         }
-
+    
         .dark-theme {
             --background-gradient: linear-gradient(135deg, #1F1727, #2A2E35);
             --chat-bg: #2E2A40;
@@ -58,7 +58,7 @@
             --announcement-border: #5A4A7A;
             --scrollbar-thumb: #6B5B95;
         }
-
+    
         body {
             background: var(--background-gradient);
             font-family: 'Segoe UI', Arial, sans-serif;
@@ -71,41 +71,87 @@
             overflow-x: hidden;
             transition: background 0.5s ease, color 0.5s ease;
         }
+    
+        .tab-switcher {
+            width: 10%; /* ~10% ширины экрана, как в макете */
+            min-width: 100px; /* Минимальная ширина для читаемости */
+            max-width: 150px; /* Максимальная ширина для компактности */
+            background: #FF4040; /* Красный цвет, как в макете */
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh; /* Фиксированная высота на всю высоту экрана */
+            padding: 20px 10px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 800; /* Выше .top-bar и .pm-panel */
+            transition: all 0.3s ease;
+        }
+    
+        .tab-btn {
+            padding: 12px 15px;
+            background: #FFFFFF;
+            color: #FF4040;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s ease, color 0.3s ease;
+            width: 100%;
+        }
+    
+        .tab-btn.active {
+            background: #FF4040;
+            color: #FFFFFF;
+        }
+    
+        .tab-btn:hover {
+            background: #FF6666;
+            color: #FFFFFF;
+        }
+    
         .chat-room, .auth-container {
-            width: 90%;
-            max-width: 1100px;
+            width: 60%; /* ~60% ширины экрана, как в макете */
+            max-width: 800px; /* Ограничение ширины для чата */
             background: var(--chat-bg);
             padding: 20px;
             border-radius: 15px;
             box-shadow: 0 8px 25px var(--shadow-color);
             display: flex;
-            flex-direction: row;
-            transition: background 0.5s ease, box-shadow 0.5s ease;
+            flex-direction: column;
+            margin-left: 15%; /* Смещаем вправо, чтобы оставить место для синей панели */
+            margin-right: 10%; /* Смещаем влево, чтобы оставить место для жёлтой панели */
+            position: relative;
+            top: 60px; /* Смещаем вниз, чтобы учесть .top-bar */
+            transition: all 0.3s ease;
+            overflow: visible; /* Убедимся, что .top-bar и другие элементы видны */
         }
-
+    
         .chat-container {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
         }
+    
         .top-bar {
-            position: fixed;
+            position: relative; /* Убираем fixed, чтобы он был внутри .chat-room */
             top: 0;
-            left: 50%; /* Изменяем с left: 0 на left: 50% для центрирования */
-            transform: translateX(-50%); /* Центрируем с помощью transform */
-            width: 90%; /* Устанавливаем ту же ширину, что и у .chat-room */
-            max-width: 1100px; /* Ограничиваем ширину, как у .chat-room */
+            left: 0;
+            width: 100%; /* Занимает всю ширину .chat-room */
             padding: 10px;
             background: var(--chat-bg);
             z-index: 600;
             box-shadow: 0 2px 10px var(--shadow-color);
             display: flex;
             flex-wrap: nowrap;
-            justify-content: space-between; /* Распределяем элементы равномерно */
-            transition: all 0.3s ease; /* Добавляем плавную анимацию */
+            justify-content: space-between;
+            transition: all 0.3s ease;
         }
+    
         #messages {
-            height: 500px;
+            height: 500px; /* Сохраняем высоту для чата */
             overflow-y: auto;
             background: var(--messages-bg);
             padding: 15px;
@@ -114,15 +160,17 @@
             scrollbar-width: thin;
             scrollbar-color: var(--scrollbar-thumb) var(--messages-bg);
             transition: background 0.5s ease;
-            position: relative;
         }
+    
         #messages::-webkit-scrollbar {
             width: 8px;
         }
+    
         #messages::-webkit-scrollbar-thumb {
             background: var(--scrollbar-thumb);
             border-radius: 4px;
         }
+    
         #message-input {
             width: 70%;
             padding: 12px 15px;
@@ -133,10 +181,12 @@
             color: var(--text-color);
             transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
         }
+    
         #message-input:focus {
             border-color: var(--nickname-color);
             box-shadow: 0 0 5px var(--shadow-color);
         }
+    
         #nickname-input, #password-input {
             width: 50%;
             padding: 12px;
@@ -149,6 +199,7 @@
             box-shadow: inset 0 2px 5px var(--shadow-color);
             transition: background 0.5s ease, color 0.5s ease;
         }
+    
         button {
             padding: 12px 20px;
             background: var(--button-bg);
@@ -158,17 +209,19 @@
             cursor: pointer;
             transition: background 0.3s ease, transform 0.2s ease;
         }
+    
         button:hover {
             background: var(--button-hover-bg);
             transform: translateY(-2px);
         }
+    
         select {
             padding: 10px 15px;
             border: none;
             border-radius: 25px;
             background: var(--auth-input-bg);
             margin-bottom: 0;
-            width: 120px;
+            width: 120px; /* Уменьшаем ширину для компактности */
             cursor: pointer;
             color: var(--text-color);
             appearance: none;
@@ -177,9 +230,11 @@
             background-position: right 10px center;
             transition: background 0.5s ease, color 0.5s ease;
         }
+    
         .dark-theme select {
             background-image: url('data:image/svg+xml;utf8,<svg fill="%236B5B95" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
         }
+    
         .message {
             margin: 10px 0;
             padding: 12px 15px;
@@ -192,15 +247,19 @@
             align-items: flex-start;
             transition: background 0.5s ease;
         }
+    
         .message:hover {
             background: #D1C4E9;
         }
+    
         .dark-theme .message:hover {
             background: #4A4063;
         }
+    
         .message:hover .delete-btn, .message:hover .reply-btn {
             display: inline;
         }
+    
         .announcement {
             margin: 15px 0;
             padding: 15px;
@@ -216,18 +275,23 @@
             display: flex;
             align-items: flex-start;
         }
+    
         .announcement .nickname {
             color: white;
         }
+    
         .announcement .timestamp {
             color: #E0E0E0;
         }
+    
         .dark-theme .announcement .timestamp {
             color: #B0B0B0;
         }
+    
         .announcement:hover {
             background: var(--button-hover-bg);
         }
+    
         .message-avatar, .user-avatar {
             width: 30px;
             height: 30px;
@@ -237,21 +301,26 @@
             border: 2px solid var(--nickname-color);
             transition: border 0.5s ease;
         }
+    
         .message-content {
             flex-grow: 1;
         }
+    
         .nickname {
             font-weight: 600;
             color: var(--nickname-color);
         }
+    
         .nickname.admin {
             color: var(--admin-nickname-color);
         }
+    
         .timestamp {
             font-size: 0.85em;
             color: var(--timestamp-color);
             margin-left: 10px;
         }
+    
         .reply-info {
             font-size: 0.9em;
             color: var(--admin-btn-bg);
@@ -263,15 +332,19 @@
             border-left: 3px solid var(--admin-btn-bg);
             transition: background 0.5s ease, color 0.5s ease, border 0.5s ease;
         }
+    
         .reply-info:hover {
             background: rgba(38, 166, 154, 0.2);
         }
+    
         .dark-theme .reply-info {
             background: rgba(74, 122, 140, 0.1);
         }
+    
         .dark-theme .reply-info:hover {
             background: rgba(74, 122, 140, 0.2);
         }
+    
         .reply-text {
             font-style: italic;
             color: var(--timestamp-color);
@@ -281,15 +354,18 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+    
         #emoji-button, #attach-button {
             margin-left: 10px;
             background: var(--admin-btn-bg);
             padding: 12px;
             font-size: 18px;
         }
+    
         #emoji-button:hover, #attach-button:hover {
             background: var(--admin-btn-hover-bg);
         }
+    
         emoji-picker {
             position: absolute;
             display: none;
@@ -299,13 +375,16 @@
             background: var(--chat-bg);
             transition: background 0.5s ease, box-shadow 0.5s ease;
         }
+    
         .input-container {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
             gap: 10px;
-            position: relative;
+            padding: 10px 0;
+            width: 100%;
         }
+    
         #new-messages-count {
             display: none;
             position: absolute;
@@ -322,12 +401,14 @@
             font-weight: bold;
             z-index: 600;
         }
+    
         #new-messages-divider {
             display: none;
             margin: 10px 0;
             text-align: center;
             position: relative;
         }
+    
         #new-messages-divider::before {
             content: "";
             position: absolute;
@@ -338,6 +419,7 @@
             background: #4A90E2;
             z-index: 1;
         }
+    
         #new-messages-divider span {
             background: var(--messages-bg);
             color: #FFFFFF;
@@ -348,67 +430,86 @@
             border-radius: 10px;
             background: #4A90E2;
         }
+    
         .hidden {
             display: none;
         }
+    
         #auth-error {
             color: var(--delete-btn-bg);
             font-size: 0.9em;
             margin-top: 5px;
         }
+    
         .users-panel {
-            width: 250px;
-            margin-left: 20px;
-            background: var(--panel-bg);
+            width: 20%; /* ~20% ширины экрана, как в макете */
+            max-width: 300px; /* Ограничение ширины для списка */
+            background: #4682B4; /* Синий цвет, как в макете */
             padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px var(--shadow-color);
-            transition: background 0.5s ease, box-shadow 0.5s ease;
+            border-radius: 10px 0 0 10px; /* Радиус только для левой стороны */
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            position: fixed;
+            top: 60px; /* Смещаем вниз, чтобы учесть .top-bar */
+            left: 10%; /* Смещаем вправо, чтобы оставить место для красной панели */
+            height: calc(100vh - 80px); /* Высота с учётом .top-bar */
+            overflow-y: auto;
+            z-index: 600;
+            display: none; /* По умолчанию скрыт, показываем в режиме "Чат" */
+            transition: all 0.3s ease;
         }
-        #close-users-btn {
-            display: none;
+    
+        .users-panel.active {
+            display: block;
         }
+    
         .users-panel h3 {
             margin: 0 0 15px 0;
             font-size: 1.2em;
-            color: var(--nickname-color);
+            color: #FFFFFF; /* Белый цвет для контраста с синим фоном */
             font-weight: 600;
-            display: inline;
         }
+    
+        #close-users-btn {
+            display: none;
+        }
+    
         #user-count {
             font-size: 0.9em;
             color: var(--timestamp-color);
             margin-left: 10px;
         }
+    
         .users-panel ul {
             list-style: none;
             padding: 0;
             margin: 0;
         }
+    
         .users-panel li {
             padding: 8px 0;
-            color: var(--text-color);
+            color: #FFFFFF;
             display: flex;
             align-items: center;
-            justify-content: flex-start; /* Изменил на flex-start для выравнивания */
-            gap: 10px; /* Добавил отступ между аватаркой и ником */
+            justify-content: flex-start;
+            gap: 10px;
             font-size: 0.95em;
             cursor: pointer;
             transition: background 0.2s ease, color 0.5s ease;
         }
+    
         .users-panel li:hover {
-            background: rgba(155, 89, 182, 0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 5px;
         }
-        .dark-theme .users-panel li:hover {
-            background: rgba(107, 91, 149, 0.1);
-        }
+    
         .users-panel li.offline {
             color: var(--offline-color);
         }
+    
         .admin-controls {
             margin-top: 15px;
         }
+    
         .admin-btn {
             padding: 8px 15px;
             font-size: 0.9em;
@@ -418,12 +519,204 @@
             width: 100%;
             transition: background 0.3s ease;
         }
+    
         .admin-btn:hover {
             background: var(--admin-btn-hover-bg);
         }
+    
         #toggle-users-btn {
             display: none;
         }
+    
+        .pm-list {
+            width: 20%;
+            max-width: 300px;
+            background: #4682B4; /* Синий цвет, как в макете */
+            padding: 15px;
+            border-radius: 10px 0 0 10px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            position: fixed;
+            top: 60px;
+            left: 10%;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            z-index: 600;
+            display: none; /* По умолчанию скрыт, показываем в режиме "PM" */
+            transition: all 0.3s ease;
+        }
+    
+        .pm-list.active {
+            display: block;
+        }
+    
+        .pm-list ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+    
+        .pm-list li {
+            padding: 8px 0;
+            color: #FFFFFF;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+    
+        .pm-list li:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+    
+        .user-profile {
+            width: 10%; /* ~10% ширины экрана, как в макете */
+            max-width: 150px; /* Ограничение ширины для профиля */
+            background: #FFFF00; /* Жёлтый цвет, как в макете */
+            padding: 15px;
+            border-radius: 0 10px 10px 0; /* Радиус только для правой стороны */
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+            position: fixed;
+            top: 60px; /* Смещаем вниз, чтобы учесть .top-bar */
+            right: 0; /* Прижимаем к правому краю */
+            height: calc(100vh - 80px); /* Высота с учётом .top-bar */
+            overflow-y: auto;
+            z-index: 600;
+            display: none; /* По умолчанию скрыт, показываем в режиме "PM" */
+            transition: all 0.3s ease;
+        }
+    
+        .user-profile.active {
+            display: block;
+        }
+    
+        .user-profile .profile-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+    
+        .user-profile .profile-info h4 {
+            margin: 0;
+            font-size: 1em;
+            color: #333;
+            font-weight: 600;
+        }
+    
+        .user-profile .profile-info .status {
+            font-size: 0.9em;
+            color: #777;
+        }
+    
+        .user-profile .profile-info .age {
+            font-size: 0.9em;
+            color: #777;
+        }
+    
+        .user-profile .achievements {
+            margin: 15px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+    
+        .user-profile .achievement {
+            background: var(--panel-bg);
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            color: var(--nickname-color);
+            transition: all 0.3s ease;
+        }
+    
+        .user-profile .bio {
+            font-style: italic;
+            color: #777;
+            margin: 15px 0;
+            padding: 10px;
+            background: var(--messages-bg);
+            border-radius: 10px;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+    
+        .pm-panel {
+            width: 250px;
+            margin-left: 20px;
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            transition: background 0.5s ease, box-shadow 0.5s ease;
+            display: none;
+            position: fixed;
+            top: 10%;
+            left: 30%; /* Смещаем влево, чтобы соответствовать синей панели */
+            height: 70vh;
+            overflow-y: auto;
+            z-index: 700;
+            visibility: hidden;
+        }
+    
+        .pm-panel.active {
+            display: block;
+            visibility: visible;
+        }
+    
+        .pm-panel h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            color: var(--username-color);
+            font-weight: 600;
+            display: inline;
+        }
+    
+        #pm-count {
+            font-size: 0.9em;
+            color: var(--timestamp-color);
+            margin-left: 10px;
+        }
+    
+        #pm-message-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--input-border);
+            border-radius: 25px;
+            background: var(--input-bg);
+            margin-bottom: 10px;
+            outline: none;
+            color: var(--text-color);
+            transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
+        }
+    
+        #pm-messages .pm-message {
+            margin: 5px 0;
+            padding: 8px;
+            background: rgba(155, 89, 182, 0.1);
+            border-radius: 10px;
+            word-wrap: break-word;
+        }
+    
+        .dark-theme #pm-messages .pm-message {
+            background: rgba(107, 91, 149, 0.1);
+        }
+    
+        #toggle-pm-btn {
+            padding: 10px 15px;
+            background: var(--admin-btn-bg);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+            margin-left: 5px;
+        }
+    
+        #toggle-pm-btn:hover {
+            background: var(--admin-btn-hover-bg);
+            transform: translateY(-2px);
+        }
+    
         .delete-btn, .reply-btn {
             display: none;
             position: absolute;
@@ -434,21 +727,26 @@
             font-size: 0.85em;
             border-radius: 20px;
         }
+    
         .reply-btn {
             background: var(--reply-btn-bg);
             right: 70px;
         }
+    
         .reply-btn:hover {
             background: var(--reply-btn-hover-bg);
         }
+    
         #cancel-reply-btn {
             background: var(--delete-btn-bg);
             padding: 8px 12px;
             margin-left: 10px;
         }
+    
         #cancel-reply-btn:hover {
             background: var(--delete-btn-hover-bg);
         }
+    
         .admin-icon {
             background: none;
             padding: 5px;
@@ -463,22 +761,27 @@
             justify-content: center;
             transition: background 0.3s ease, color 0.5s ease;
         }
+    
         .admin-icon:hover {
             background: rgba(38, 166, 154, 0.2);
             color: var(--admin-btn-hover-bg);
         }
+    
         .dark-theme .admin-icon:hover {
             background: rgba(74, 122, 140, 0.2);
         }
+    
         #typing-status {
             font-size: 0.9em;
             color: var(--timestamp-color);
             margin-top: 10px;
         }
+    
         .media-container {
             margin-top: 10px;
             max-width: 100%;
         }
+    
         .media-container img {
             max-width: 300px;
             border-radius: 10px;
@@ -486,12 +789,14 @@
             cursor: pointer;
             transition: box-shadow 0.5s ease;
         }
+    
         .media-container video, .media-container audio {
             max-width: 300px;
             border-radius: 10px;
             box-shadow: 0 2px 5px var(--shadow-color);
             transition: box-shadow 0.5s ease;
         }
+    
         .modal, .image-modal, .preview-modal {
             display: none;
             position: fixed;
@@ -505,6 +810,7 @@
             z-index: 1000;
             animation: fadeIn 0.3s ease;
         }
+    
         #upload-progress {
             width: 70%;
             height: 8px;
@@ -515,12 +821,14 @@
             display: none;
             transition: background 0.5s ease;
         }
+    
         #upload-progress-bar {
             width: 0%;
             height: 100%;
             background: var(--button-bg);
             transition: width 0.3s ease;
         }
+    
         #notification {
             position: fixed;
             top: 20px;
@@ -537,14 +845,17 @@
             animation: slideInNotification 0.3s ease forwards;
             transition: background 0.5s ease, box-shadow 0.5s ease;
         }
+    
         @keyframes slideInNotification {
             from { transform: translateY(-100%); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
+    
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
         }
+    
         .modal-content, .image-modal-content, .preview-modal-content {
             background: var(--chat-bg);
             padding: 20px;
@@ -557,16 +868,19 @@
             animation: slideIn 0.3s ease forwards;
             transition: background 0.5s ease, box-shadow 0.5s ease;
         }
+    
         .image-modal-content, .preview-modal-content {
             width: auto;
             max-width: 90%;
             max-height: 90vh;
             padding: 10px;
         }
+    
         @keyframes slideIn {
             from { transform: translateY(-50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
+    
         .modal-content img {
             width: 100px;
             height: 100px;
@@ -575,9 +889,11 @@
             border: 3px solid var(--nickname-color);
             transition: border 0.5s ease;
         }
+    
         .modal-content img:hover {
             transform: scale(1.05);
         }
+    
         .image-modal-content img, .preview-modal-content img {
             max-width: 100%;
             max-height: 80vh;
@@ -585,6 +901,7 @@
             box-shadow: 0 4px 15px var(--shadow-color);
             transition: box-shadow 0.5s ease;
         }
+    
         .preview-modal-content video {
             max-width: 100%;
             max-height: 80vh;
@@ -592,141 +909,17 @@
             box-shadow: 0 4px 15px var(--shadow-color);
             transition: box-shadow 0.5s ease;
         }
+    
         .preview-buttons {
             margin-top: 10px;
             display: flex;
             justify-content: space-between;
         }
+    
         .preview-buttons button {
             width: 48%;
         }
-        .profile-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-        .profile-info {
-            flex-grow: 1;
-        }
-        .profile-info h4 {
-            margin: 0;
-            font-size: 1.5em;
-            color: var(--text-color);
-            font-weight: 600;
-            transition: color 0.5s ease;
-        }
-        .profile-info .status {
-            font-size: 0.95em;
-            color: var(--timestamp-color);
-            margin: 5px 0;
-        }
-        .profile-info .status.online::before {
-            content: "● ";
-            color: var(--admin-btn-bg);
-        }
-        .profile-info .status.offline::before {
-            content: "● ";
-            color: var(--offline-color);
-        }
-        .profile-info .age {
-            font-size: 0.9em;
-            color: var(--timestamp-color);
-            margin: 5px 0;
-        }
-        .achievements {
-            margin: 15px 0;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .achievement {
-            background: var(--panel-bg);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            color: var(--nickname-color);
-            font-weight: 500;
-            box-shadow: 0 2px 5px var(--shadow-color);
-            transition: background 0.5s ease, color 0.5s ease, box-shadow 0.5s ease;
-        }
-        .pm-panel {
-            width: 250px;
-            margin-left: 20px;
-            background: var(--panel-bg);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px var(--shadow-color);
-            transition: background 0.5s ease, box-shadow 0.5s ease;
-            display: none;
-            position: fixed; /* Убедимся, что позиция фиксированная */
-            top: 10%; /* Сохраняем позицию сверху */
-            left: 20px; /* Фиксированный отступ слева */
-            height: 70vh; /* Та же высота, что и на мобильных */
-            overflow-y: auto; /* Скроллинг для больших историй */
-            z-index: 700; /* Выше .top-bar (z-index: 600) */
-            visibility: hidden; /* Добавляем для начального скрытия, чтобы управлять видимостью */
-        }
-
-        .pm-panel.active {
-            display: block;
-            visibility: visible; /* Делаем видимой при активации */
-        }
-
-        .pm-panel h3 {
-            margin: 0 0 15px 0;
-            font-size: 1.2em;
-            color: var(--username-color);
-            font-weight: 600;
-            display: inline;
-        }
-
-        #pm-count {
-            font-size: 0.9em;
-            color: var(--timestamp-color);
-            margin-left: 10px;
-        }
-
-        #pm-message-input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid var(--input-border);
-            border-radius: 25px;
-            background: var(--input-bg);
-            margin-bottom: 10px;
-            outline: none;
-            color: var(--text-color);
-            transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
-        }
-
-        #pm-messages .pm-message {
-            margin: 5px 0;
-            padding: 8px;
-            background: rgba(155, 89, 182, 0.1);
-            border-radius: 10px;
-            word-wrap: break-word;
-        }
-
-        .dark-theme #pm-messages .pm-message {
-            background: rgba(107, 91, 149, 0.1);
-        }
-
-        #toggle-pm-btn {
-            padding: 10px 15px; /* Уменьшаем горизонтальный padding с 20px до 15px */
-            background: var(--admin-btn-bg);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: background 0.3s ease, transform 0.2s ease;
-            margin-left: 5px; /* Уменьшаем отступ с 10px до 5px */
-        }
-
-        #toggle-pm-btn:hover {
-            background: var(--admin-btn-hover-bg);
-            transform: translateY(-2px);
-        }
-
+    
         .bio {
             font-style: italic;
             color: var(--timestamp-color);
@@ -738,6 +931,7 @@
             line-height: 1.4;
             transition: background 0.5s ease, color 0.5s ease;
         }
+    
         .close-btn {
             position: absolute;
             top: 15px;
@@ -749,18 +943,22 @@
             cursor: pointer;
             transition: color 0.3s ease;
         }
+    
         .close-btn:hover {
             color: var(--delete-btn-bg);
         }
+    
         .edit-form, .group-form {
             display: none;
             margin-top: 20px;
             animation: fadeSlideIn 0.3s ease;
         }
+    
         @keyframes fadeSlideIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+    
         .edit-form input, .edit-form textarea, .group-form select {
             width: 100%;
             padding: 10px;
@@ -773,27 +971,32 @@
             color: var(--text-color);
             transition: border-color 0.3s ease, background 0.5s ease, color 0.5s ease;
         }
+    
         .edit-form input:focus, .edit-form textarea:focus, .group-form select:focus {
             border-color: var(--nickname-color);
             outline: none;
         }
+    
         .edit-form textarea {
             height: 80px;
             resize: none;
         }
+    
         .edit-form button, .group-form button {
             margin-top: 10px;
             width: 48%;
             font-size: 1em;
         }
+    
         .edit-form button:nth-child(2), .group-form button:nth-child(2) {
             background: var(--delete-btn-bg);
             margin-left: 4%;
         }
+    
         .edit-form button:nth-child(2):hover, .group-form button:nth-child(2):hover {
             background: var(--delete-btn-hover-bg);
         }
-
+    
         @media (max-width: 768px) {
             body {
                 align-items: flex-start;
@@ -839,11 +1042,11 @@
                 z-index: 700;
                 display: none;
             }
-
+    
             .pm-panel.active {
                 display: block;
             }
-
+    
             #close-pm-btn, #toggle-pm-btn {
                 padding: 10px 15px;
                 font-size: 16px;
@@ -888,8 +1091,8 @@
                 transition: background 0.3s ease, transform 0.2s ease;
             }
             #toggle-users-btn:hover {
-            background: var(--admin-btn-hover-bg);
-            transform: translateY(-2px);
+                background: var(--admin-btn-hover-bg);
+                transform: translateY(-2px);
             }
             #messages {
                 height: calc(100vh - 140px); /* Уменьшил высоту для учета панелей ввода и топ-бара */
