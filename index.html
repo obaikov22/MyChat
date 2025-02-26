@@ -88,10 +88,16 @@
             flex-direction: column;
         }
         .top-bar {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background: var(--chat-bg);
+            z-index: 600;
+            box-shadow: 0 2px 10px var(--shadow-color);
+            flex-wrap: nowrap;
+            justify-content: space-between; /* Распределяем элементы равномерно */
         }
         #messages {
             height: 500px;
@@ -648,6 +654,16 @@
             box-shadow: 0 4px 15px var(--shadow-color);
             transition: background 0.5s ease, box-shadow 0.5s ease;
             display: none;
+            position: fixed; /* Добавляем позиционирование для ПК */
+            top: 10%; /* Те же значения, что и на мобильных */
+            left: 20px; /* Фиксированный отступ слева вместо transform */
+            height: 70vh; /* Та же высота, что и на мобильных */
+            overflow-y: auto; /* Скроллинг для больших историй */
+            z-index: 700; /* Убедимся, что выше .top-bar (z-index: 600) */
+        }
+
+        .pm-panel.active {
+            display: block;
         }
 
         .pm-panel h3 {
@@ -1525,16 +1541,21 @@
         }
 
         function togglePMPanel() {
-            console.log("togglePMPanel вызвана"); // Отладка
+            console.log("togglePMPanel вызвана");
             const pmPanel = document.getElementById("pm-panel");
             if (!pmPanel) {
                 console.error("Панель PM не найдена");
                 return;
             }
             pmPanel.classList.toggle("active");
+            console.log("pmPanel.active:", pmPanel.classList.contains("active"), "Стиль display:", pmPanel.style.display, "Стиль visibility:", pmPanel.style.visibility);
             if (pmPanel.classList.contains("active")) {
                 loadPMUsers();
                 updatePMCount(); // Обновляем счётчик при открытии
+                // Проверяем, видима ли панель
+                if (pmPanel.style.display === "none" || pmPanel.style.visibility === "hidden") {
+                    console.warn("Панель PM не видна, проверь стили");
+                }
             }
         }
 
