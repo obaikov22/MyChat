@@ -81,6 +81,7 @@
             display: flex;
             flex-direction: row;
             transition: background 0.5s ease, box-shadow 0.5s ease;
+            overflow: visible; /* Убедимся, что панель PM видна, если выходит за пределы */
         }
         .chat-container {
             flex-grow: 1;
@@ -654,16 +655,18 @@
             box-shadow: 0 4px 15px var(--shadow-color);
             transition: background 0.5s ease, box-shadow 0.5s ease;
             display: none;
-            position: fixed; /* Добавляем позиционирование для ПК */
-            top: 10%; /* Те же значения, что и на мобильных */
-            left: 20px; /* Фиксированный отступ слева вместо transform */
+            position: fixed; /* Убедимся, что позиция фиксированная */
+            top: 10%; /* Сохраняем позицию сверху */
+            left: 20px; /* Фиксированный отступ слева */
             height: 70vh; /* Та же высота, что и на мобильных */
             overflow-y: auto; /* Скроллинг для больших историй */
-            z-index: 700; /* Убедимся, что выше .top-bar (z-index: 600) */
+            z-index: 700; /* Выше .top-bar (z-index: 600) */
+            visibility: hidden; /* Добавляем для начального скрытия, чтобы управлять видимостью */
         }
 
         .pm-panel.active {
             display: block;
+            visibility: visible; /* Делаем видимой при активации */
         }
 
         .pm-panel h3 {
@@ -1548,13 +1551,18 @@
                 return;
             }
             pmPanel.classList.toggle("active");
-            console.log("pmPanel.active:", pmPanel.classList.contains("active"), "Стиль display:", pmPanel.style.display, "Стиль visibility:", pmPanel.style.visibility);
+            console.log("pmPanel.active:", pmPanel.classList.contains("active"), "Стиль display:", pmPanel.style.display, "Стиль visibility:", pmPanel.style.visibility, "Позиция:", pmPanel.getBoundingClientRect());
             if (pmPanel.classList.contains("active")) {
                 loadPMUsers();
                 updatePMCount(); // Обновляем счётчик при открытии
                 // Проверяем, видима ли панель
                 if (pmPanel.style.display === "none" || pmPanel.style.visibility === "hidden") {
                     console.warn("Панель PM не видна, проверь стили");
+                }
+                // Проверяем, находится ли панель в видимой области
+                const rect = pmPanel.getBoundingClientRect();
+                if (rect.top < 0 || rect.bottom > window.innerHeight || rect.left < 0 || rect.right > window.innerWidth) {
+                    console.warn("Панель PM вне видимой области, корректируй стили");
                 }
             }
         }
